@@ -10,8 +10,11 @@ class RAGPipeline:
     """
 
     def __init__(self, config_path="config/config.yaml"):
-        with open(config_path, "r") as f:
-            self.config = yaml.safe_load(f)
+        try:
+            with open(config_path, "r") as f:
+                self.config = yaml.safe_load(f)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load config: {e}")
         self.retriever_type = self.config.get("retriever_type", "stub")
         self.generator_type = self.config.get("generator_type", "stub")
         self.llm_model = self.config.get("llm_model", "default-llm")
@@ -22,6 +25,8 @@ class RAGPipeline:
         self.generator = GeneratorStub()
 
     def run(self, question):
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError("Question must be a non-empty string.")
         context = self.retriever.retrieve(question)
         answer = self.generator.generate(context, question)
         print(f"Using LLM model: {self.llm_model}")
