@@ -1,13 +1,28 @@
+import yaml
 from retriever.retriever import RetrieverStub
 from generator.generator import GeneratorStub
 
 
 class RAGPipeline:
-    def __init__(self):
+    def __init__(self, config_path="config/config.yaml"):
+        with open(config_path, "r") as f:
+            self.config = yaml.safe_load(f)
+        self.retriever_type = self.config.get("retriever_type", "stub")
+        self.generator_type = self.config.get("generator_type", "stub")
+        self.llm_model = self.config.get("llm_model", "default-llm")
+        self.max_tokens = self.config.get("max_tokens", 100)
+        self.data_path = self.config.get("data_path", "data/")
+        self.temperature = self.config.get("temperature", 1.0)
         self.retriever = RetrieverStub()
         self.generator = GeneratorStub()
 
     def run(self, question):
         context = self.retriever.retrieve(question)
         answer = self.generator.generate(context, question)
+        print(f"Using LLM model: {self.llm_model}")
+        print(f"Retriever type: {self.retriever_type}")
+        print(f"Generator type: {self.generator_type}")
+        print(f"Max tokens: {self.max_tokens}")
+        print(f"Data path: {self.data_path}")
+        print(f"Temperature: {self.temperature}")
         return context, answer
