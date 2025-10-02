@@ -1,22 +1,13 @@
-class RetrieverStub:
-    def retrieve(self, query):
-        return ["Documento exemplo sobre RAG"]
-
-
-class GeneratorStub:
-    def generate(self, context, question):
-        return "Resposta gerada pelo LLM (stub)"
+from pipeline.rag_pipeline import RAGPipeline
 
 
 def main():
-    retriever = RetrieverStub()
-    generator = GeneratorStub()
-    question = "O que é Retrieval-Augmented Generation?"
-    context = retriever.retrieve(question)
-    answer = generator.generate(context, question)
-    print("Pergunta:", question)
-    print("Contexto:", context)
-    print("Resposta:", answer)
+    pipeline = RAGPipeline()
+    question = "What is Retrieval-Augmented Generation?"
+    context, answer = pipeline.run(question)
+    print("Question:", question)
+    print("Context:", context)
+    print("Answer:", answer)
 
 
 if __name__ == "__main__":
