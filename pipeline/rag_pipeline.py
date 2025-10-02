@@ -4,6 +4,11 @@ from generator.generator import GeneratorStub
 
 
 class RAGPipeline:
+    """
+    Pipeline for Retrieval-Augmented Generation (RAG).
+    Loads configuration from YAML and orchestrates retriever and generator components.
+    """
+
     def __init__(self, config_path="config/config.yaml"):
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
