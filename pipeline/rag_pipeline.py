@@ -1,6 +1,6 @@
 import yaml
 from retriever.retriever import RetrieverStub
-from generator.generator import GeneratorStub
+from generator.generator import GeneratorStub, LLMGenerator
 
 
 class RAGPipeline:
@@ -22,7 +22,12 @@ class RAGPipeline:
         self.data_path = self.config.get("data_path", "data/")
         self.temperature = self.config.get("temperature", 1.0)
         self.retriever = RetrieverStub()
-        self.generator = GeneratorStub()
+        if self.generator_type == "llm":
+            self.generator = LLMGenerator(
+                self.llm_model, self.max_tokens, self.temperature
+            )
+        else:
+            self.generator = GeneratorStub()
 
     def run(self, question):
         if not isinstance(question, str) or not question.strip():

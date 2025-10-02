@@ -1,6 +1,6 @@
 llm_model: "microsoft/bitnet-b1.58-2B-4T"
 retriever_type: "stub"
-generator_type: "stub"
+generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
 temperature: 0.7
