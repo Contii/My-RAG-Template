@@ -1,6 +1,8 @@
 import logging
 import os
 import yaml
+import time
+import psutil
 from datetime import datetime
 
 def setup_logger(config_path="config/config.yaml"):
@@ -44,3 +46,23 @@ def get_logger(name):
     Get logger instance for specific component.
     """
     return logging.getLogger(name)
+
+def log_performance_metrics(logger, operation, start_time, end_time):
+    """
+    Log performance metrics for operations.
+    """
+    duration = end_time - start_time
+    cpu_percent = psutil.cpu_percent()
+    memory_info = psutil.virtual_memory()
+    
+    logger.info(f"PERFORMANCE [{operation}] - Duration: {duration:.2f}s, CPU: {cpu_percent}%, Memory: {memory_info.percent}%")
+
+def log_system_info(logger):
+    """
+    Log system information for monitoring.
+    """
+    cpu_count = psutil.cpu_count()
+    memory_total = psutil.virtual_memory().total / (1024**3)  # GB
+    disk_usage = psutil.disk_usage('/').percent
+    
+    logger.info(f"SYSTEM_INFO - CPUs: {cpu_count}, Memory: {memory_total:.2f}GB, Disk: {disk_usage}%")
