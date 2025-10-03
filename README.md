@@ -1,11 +1,11 @@
 # My-RAG Template
 
-Laboratório para desenvolvimento de sistemas RAG (Retrieval-Augmented Generation) com LLMs leves, integrando modelos do [Hugging Face](https://huggingface.co/) e PyTorch para aplicações de NLP.
+Laboratório para desenvolvimento de sistemas de Retrieval-Augmented Generation (RAG) com LLMs leves, integrando modelos do [Hugging Face](https://huggingface.co/) e PyTorch.
 
 ## Características
 
-- Demonstra arquitetura moderna para IA generativa baseada em busca e geração.
-- Serve como base para soluções escaláveis de NLP, pesquisa semântica e chatbots inteligentes.
+- Arquitetura moderna para IA generativa baseada em busca e geração.
+- Base para soluções escaláveis de NLP, pesquisa semântica e chatbots inteligentes.
 - Estrutura modular e extensível, facilitando integração com diferentes fontes de dados e modelos.
 - Foco em eficiência e execução local de LLMs.
 - Pronto para expansão: múltiplos bancos de dados, adaptação de modelos, integração com APIs.
@@ -14,12 +14,34 @@ Laboratório para desenvolvimento de sistemas RAG (Retrieval-Augmented Generatio
 ## Aplicações
 
 - Chatbots avançados
-- Pesquisa semântica em grandes corpora
+- Pesquisa semântica em *corpora extensa*
 - Sistemas de recomendação baseados em linguagem natural
 
 ## Instalação
 
-Consulte [INSTALL.md](./docs/INSTALL.md) para instruções detalhadas de instalação e configuração do ambiente inicial.
+Consulte as [instruções detalhadas](./docs/INSTALL.md) de instalação e configuração do ambiente inicial.
+
+## Configuração
+
+Os principais parâmetros estão em `config/config.yaml`.  
+Exemplo:
+
+```yaml
+llm_model: "microsoft/bitnet-b1.58-2B-4T"
+retriever_type: "stub"
+generator_type: "stub"
+max_tokens: 250
+data_path: "data/documents/"
+temperature: 0.7
+```
+
+## Uso
+
+Execute o pipeline principal:
+
+```sh
+python main.py
+```
 
 ## Referências
 
