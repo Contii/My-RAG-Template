@@ -1,7 +1,9 @@
 import yaml
-import logging
+from logging.logger import get_logger
 from retriever.retriever import RetrieverStub
 from generator.generator import GeneratorStub, LLMGenerator
+
+logger = get_logger("pipeline")
 
 
 class RAGPipeline:
@@ -11,13 +13,13 @@ class RAGPipeline:
     """
 
     def __init__(self, use_rag=True, config_path="config/config.yaml"):
-        logging.info("Initializing RAGPipeline")
+        logger.info("Initializing RAGPipeline")
         try:
             with open(config_path, "r") as f:
                 self.config = yaml.safe_load(f)
-            logging.info("Configuration loaded successfully")
+            logger.info("Configuration loaded successfully")
         except Exception as e:
-            logging.error(f"Error loading config: {e}")
+            logger.error(f"Error loading config: {e}")
             raise RuntimeError(f"Failed to load config: {e}")
         self.use_rag = use_rag
         self.retriever_type = self.config.get("retriever_type", "stub")
@@ -31,21 +33,21 @@ class RAGPipeline:
             self.generator = LLMGenerator(self.llm_model, self.max_tokens, self.temperature)
         else:
             self.generator = GeneratorStub()
-        logging.info(f"Configured retriever: {self.retriever_type}, generator: {self.generator_type}")
+        logger.info(f"Configured retriever: {self.retriever_type}, generator: {self.generator_type}")
 
     def run(self, question):
-        logging.info("Running RAG pipeline")
+        logger.info("Running RAG pipeline")
         if not isinstance(question, str) or not question.strip():
-            logging.error(f"Invalid question received: {question}")
+            logger.error(f"Invalid question received: {question}")
             raise ValueError("Question must be a non-empty string.")
         if self.use_rag:
             context = self.retriever.retrieve(question)
             answer = self.generator.generate(context, question)
-            logging.info(f"Retriever type: {self.retriever_type}\n Generator type: {self.generator_type}\n Data path: {self.data_path}")
+            logger.info(f"Retriever type: {self.retriever_type}\n Generator type: {self.generator_type}\n Data path: {self.data_path}")
             print(f"Retriever type: {self.retriever_type}\n Generator type: {self.generator_type}\n Data path: {self.data_path}")
         else:
             context = []
-        logging.info(f"Using LLM model: {self.llm_model}\n Max tokens: {self.max_tokens}\n Temperature: {self.temperature}")
+        logger.info(f"Using LLM model: {self.llm_model}\n Max tokens: {self.max_tokens}\n Temperature: {self.temperature}")
         print(f"Using LLM model: {self.llm_model}\n Max tokens: {self.max_tokens}\n Temperature: {self.temperature}")
         answer = self.generator.generate(context, question)
         return context, answer

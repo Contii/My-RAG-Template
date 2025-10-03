@@ -1,4 +1,7 @@
-import logging
+from logging.logger import get_logger
+
+logger = get_logger("retriever")
+
 
 class RetrieverStub:
     """
@@ -6,5 +9,5 @@ class RetrieverStub:
     """
 
     def retrieve(self, query):
-        logging.info(f"Retrieving context for query: {query}")
+        logger.info(f"Retrieving context for query: {query}")
         return ["Sample document about RAG"]
