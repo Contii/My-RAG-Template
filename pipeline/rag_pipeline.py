@@ -9,12 +9,13 @@ class RAGPipeline:
     Loads configuration from YAML and orchestrates retriever and generator components.
     """
 
-    def __init__(self, config_path="config/config.yaml"):
+    def __init__(self, use_rag=True, config_path="config/config.yaml"):
         try:
             with open(config_path, "r") as f:
                 self.config = yaml.safe_load(f)
         except Exception as e:
             raise RuntimeError(f"Failed to load config: {e}")
+        self.use_rag = use_rag
         self.retriever_type = self.config.get("retriever_type", "stub")
         self.generator_type = self.config.get("generator_type", "stub")
         self.llm_model = self.config.get("llm_model", "default-llm")
@@ -32,12 +33,16 @@ class RAGPipeline:
     def run(self, question):
         if not isinstance(question, str) or not question.strip():
             raise ValueError("Question must be a non-empty string.")
-        context = self.retriever.retrieve(question)
-        answer = self.generator.generate(context, question)
+        if self.use_rag:
+            context = self.retriever.retrieve(question)
+            answer = self.generator.generate(context, question)
+            print(f"Retriever type: {self.retriever_type}")
+            print(f"Generator type: {self.generator_type}")
+            print(f"Data path: {self.data_path}")
+        else:
+            context = []
         print(f"Using LLM model: {self.llm_model}")
-        print(f"Retriever type: {self.retriever_type}")
-        print(f"Generator type: {self.generator_type}")
         print(f"Max tokens: {self.max_tokens}")
-        print(f"Data path: {self.data_path}")
         print(f"Temperature: {self.temperature}")
+        answer = self.generator.generate(context, question)
         return context, answer

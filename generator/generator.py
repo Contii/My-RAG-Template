@@ -29,12 +29,22 @@ class LLMGenerator:
 
     def generate(self, context, question):
         try:
-            prompt = f"{' '.join(context)}\nQuestion: {question}\nAnswer:"
+            if context and any(context):
+                prompt = f"<|begin_of_text|>Context: {' '.join(context)}<|eot_id|>User: {question}<|eot_id|>Assistant: "
+            else:
+                prompt = f"<|begin_of_text|>User: {question}<|eot_id|>Assistant: "
             inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
             output = self.model.generate(
-                **inputs, max_new_tokens=self.max_tokens, temperature=self.temperature
+                **inputs,
+                max_new_tokens=self.max_tokens,
+                temperature=self.temperature,
+                pad_token_id=self.tokenizer.eos_token_id,
             )
             answer = self.tokenizer.decode(output[0], skip_special_tokens=True)
+            if "<|begin_of_text|>" in answer:
+                answer = answer.split("<|begin_of_text|>")[-1]
+            if "Assistant:" in answer:
+                answer = answer.split("Assistant:")[-1].strip()
             return answer
         except Exception as e:
             return f"Error generating answer: {e}"
