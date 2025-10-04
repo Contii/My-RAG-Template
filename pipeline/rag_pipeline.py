@@ -2,7 +2,7 @@ import yaml
 import time
 from retriever.retriever import RetrieverStub
 from generator.generator import GeneratorStub, LLMGenerator
-from logging.logger import get_logger, log_performance_metrics
+from logger.logger import get_logger, log_generation_metrics
 
 logger = get_logger("pipeline")
 
@@ -46,13 +46,7 @@ class RAGPipeline:
             raise ValueError("Question must be a non-empty string.")
         
         if self.use_rag:
-            start_retrieval = time.time()
             context = self.retriever.retrieve(question)
-            end_retrieval = time.time()
-
-            log_performance_metrics(logger, "CONTEXT_RETRIEVAL", start_retrieval, end_retrieval)
-            logger.info(f"Context retrieved: {context}")
-
             print(f"Retriever type: {self.retriever_type}")
             print(f"Generator type: {self.generator_type}")
             print(f"Data path: {self.data_path}")
@@ -63,11 +57,8 @@ class RAGPipeline:
         print(f"Max tokens: {self.max_tokens}")
         print(f"Temperature: {self.temperature}")
         
-        start_generation = time.time()
-        answer = self.generator.generate(context, question)
-        end_generation = time.time()
-        
-        log_performance_metrics(logger, "TEXT_GENERATION", start_generation, end_generation)
+        answer, generation_time = self.generator.generate(context, question)
         logger.info(f"Answer generated: {answer}")
+        log_generation_metrics(logger, generation_time)
         
         return context, answer

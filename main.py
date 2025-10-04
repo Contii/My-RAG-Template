@@ -1,8 +1,7 @@
 import time
 import warnings
 from pipeline.rag_pipeline import RAGPipeline
-from logging.logger import setup_logger, get_logger, log_performance_metrics, log_system_info
-
+from logger.logger import setup_logger, get_logger, log_model_loading_metrics
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -23,34 +22,29 @@ def main():
     pipeline = RAGPipeline(use_rag=use_rag)
     end_load = time.time()
     
-    log_performance_metrics(logger, "MODEL_LOADING", start_load, end_load)
+    log_model_loading_metrics(logger, end_load - start_load)
     print(f"LLM loaded in {end_load - start_load:.2f} seconds.")
 
     print("Type your questions below (type 'exit' to quit):")
     print("--------------------------------------------------")
     while True:
         question = input("\nQuestion: ")
-        logger.info(f"Received question: {question}")
         if question.strip().lower() == "exit":
             logger.info("Exiting application.")
             print("Exiting...")
             break
 
+        logger.info(f"Received question: {question}")
+        
         start_gen = time.time()
         context, answer = pipeline.run(question)
         end_gen = time.time()
-
-        logger.info(f"Received question: {question}")
-        log_performance_metrics(logger, "ANSWER_GENERATION", start_gen, end_gen)
         
         if use_rag:
             print("Context:", context)
-        logger.info(f"Received answer: {answer}")
         print("\nAnswer:", answer)
-        logger.info(f"Answer generated in {end_gen - start_gen:.2f} seconds.")
         print(f"\nAnswer generated in {end_gen - start_gen:.2f} seconds.")
         print("--------------------------------------------------")
-
 
 if __name__ == "__main__":
     main()

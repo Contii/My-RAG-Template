@@ -1,4 +1,4 @@
-from logging.logger import get_logger
+from logger.logger import get_logger
 
 logger = get_logger("retriever")
 
