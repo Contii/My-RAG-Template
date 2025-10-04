@@ -17,12 +17,12 @@ class LLMGenerator:
     """
     Generator that uses a Hugging Face LLM to generate answers.
     """
-    def __init__(self, model_id, max_tokens=250, temperature=0.7):
+    def __init__(self, model_id, max_tokens=250, temperature=0.7, max_gpu_memory="3.8GB"):
         logger.info(f"Loading LLM model: {model_id}")
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, torch_dtype=torch.bfloat16, device_map="auto"
+                model_id, torch_dtype=torch.bfloat16, device_map="auto", max_memory={0: max_gpu_memory}
             )
             
             # Log GPU information

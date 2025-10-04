@@ -30,10 +30,11 @@ class RAGPipeline:
         self.max_tokens = self.config.get("max_tokens", 100)
         self.data_path = self.config.get("data_path", "data/")
         self.temperature = self.config.get("temperature", 1.0)
+        self.max_gpu_memory = self.config.get("max_gpu_memory", "3.8GB")
 
         self.retriever = RetrieverStub()
         if self.generator_type == "llm":
-            self.generator = LLMGenerator(self.llm_model, self.max_tokens, self.temperature)
+            self.generator = LLMGenerator(self.llm_model, self.max_tokens, self.temperature, self.max_gpu_memory)
         else:
             self.generator = GeneratorStub()
 

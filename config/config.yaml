@@ -4,6 +4,7 @@ generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
 temperature: 0.7
+max_gpu_memory: "3.8GB" # aprox 95% of 4GB GPU
 
 # Logging configuration
 logging:
