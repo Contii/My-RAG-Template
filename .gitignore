@@ -1,7 +1,8 @@
-docs/00-Guia-RAG.md
-docs/01-Roadmap-RAG.md
-docs/LLM_Load_Example.ipynb
+docs/*
+!docs/INSTALL.md
 
+logs/
+*.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

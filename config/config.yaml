@@ -4,4 +4,11 @@ generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
 temperature: 0.7
-tokenizer.pad_token_id: tokenizer.eos_token_id
+max_gpu_memory: "3.8GB" # aprox 95% of 4GB GPU
+
+# Logging configuration
+logging:
+  level: "INFO"
+  log_to_file: true
+  log_file: "logs/rag.log"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

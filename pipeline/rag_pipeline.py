@@ -1,6 +1,10 @@
 import yaml
+import time
 from retriever.retriever import RetrieverStub
 from generator.generator import GeneratorStub, LLMGenerator
+from logger.logger import get_logger, log_generation_metrics
+
+logger = get_logger("pipeline")
 
 
 class RAGPipeline:
@@ -10,11 +14,15 @@ class RAGPipeline:
     """
 
     def __init__(self, use_rag=True, config_path="config/config.yaml"):
+        logger.info("Initializing RAGPipeline")
         try:
             with open(config_path, "r") as f:
                 self.config = yaml.safe_load(f)
+            logger.info("Configuration loaded successfully")
         except Exception as e:
+            logger.error(f"Error loading config: {e}")
             raise RuntimeError(f"Failed to load config: {e}")
+        
         self.use_rag = use_rag
         self.retriever_type = self.config.get("retriever_type", "stub")
         self.generator_type = self.config.get("generator_type", "stub")
@@ -22,27 +30,36 @@ class RAGPipeline:
         self.max_tokens = self.config.get("max_tokens", 100)
         self.data_path = self.config.get("data_path", "data/")
         self.temperature = self.config.get("temperature", 1.0)
+        self.max_gpu_memory = self.config.get("max_gpu_memory", "3.8GB")
+
         self.retriever = RetrieverStub()
         if self.generator_type == "llm":
-            self.generator = LLMGenerator(
-                self.llm_model, self.max_tokens, self.temperature
-            )
+            self.generator = LLMGenerator(self.llm_model, self.max_tokens, self.temperature, self.max_gpu_memory)
         else:
             self.generator = GeneratorStub()
 
+        logger.info(f"Configured retriever: {self.retriever_type}, generator: {self.generator_type}")
+
     def run(self, question):
+        logger.info("Running RAG pipeline")
         if not isinstance(question, str) or not question.strip():
+            logger.error(f"Invalid question received: {question}")
             raise ValueError("Question must be a non-empty string.")
+        
         if self.use_rag:
             context = self.retriever.retrieve(question)
-            answer = self.generator.generate(context, question)
             print(f"Retriever type: {self.retriever_type}")
             print(f"Generator type: {self.generator_type}")
             print(f"Data path: {self.data_path}")
         else:
             context = []
+        
         print(f"Using LLM model: {self.llm_model}")
         print(f"Max tokens: {self.max_tokens}")
         print(f"Temperature: {self.temperature}")
-        answer = self.generator.generate(context, question)
+        
+        answer, generation_time = self.generator.generate(context, question)
+        logger.info(f"Answer generated: {answer}")
+        log_generation_metrics(logger, generation_time)
+        
         return context, answer
