@@ -1,10 +1,8 @@
 import logging
 import os
 import yaml
-import time
 import psutil
 import torch
-from datetime import datetime
 
 def setup_logger(config_path="config/config.yaml"):
     """
@@ -52,54 +50,6 @@ def get_logger(name):
     Get logger instance for specific component.
     """
     return logging.getLogger(name)
-
-def log_performance_metrics(logger, operation, start_time, end_time, gpu_percent=None):
-    """
-    Log performance metrics for operations.
-    """
-    duration = end_time - start_time
-    cpu_percent = psutil.cpu_percent()
-    memory_info = psutil.virtual_memory()
-    
-    if gpu_percent is not None:
-        logger.info(f"PERFORMANCE [{operation}] - Duration: {duration:.2f}s, CPU: {cpu_percent}%, Memory: {memory_info.percent}%, GPU: {gpu_percent:.1f}%")
-    else:
-        logger.info(f"PERFORMANCE [{operation}] - Duration: {duration:.2f}s, CPU: {cpu_percent}%, Memory: {memory_info.percent}%")
-
-def get_gpu_usage():
-    """
-    Get GPU usage percentage.
-    """
-    if torch.cuda.is_available():
-        total_memory = torch.cuda.get_device_properties(0).total_memory
-        allocated_memory = torch.cuda.memory_allocated(0)
-        return (allocated_memory / total_memory) * 100
-    return None
-
-def log_system_info(logger):
-    """
-    Log system information for monitoring.
-    """
-    cpu_count = psutil.cpu_count()
-    memory_total = psutil.virtual_memory().total / (1024**3)  # GB
-    disk_usage = psutil.disk_usage('/').percent
-    
-    # GPU info
-    if torch.cuda.is_available():
-        gpu_count = torch.cuda.device_count()
-        gpu_name = torch.cuda.get_device_name(0)
-        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-        logger.info(f"SYSTEM_INFO - CPUs: {cpu_count}, Memory: {memory_total:.2f}GB, Disk: {disk_usage}%, GPU: {gpu_name} ({gpu_memory:.2f}GB)")
-    else:
-        logger.info(f"SYSTEM_INFO - CPUs: {cpu_count}, Memory: {memory_total:.2f}GB, Disk: {disk_usage}%, GPU: Not available")
-
-def log_llm_metrics(logger, input_tokens, output_tokens, generation_time, tokens_per_second):
-    """
-    Log LLM-specific metrics.
-    """
-    total_tokens = input_tokens + output_tokens
-    logger.info(f"LLM_METRICS - Input: {input_tokens} tokens, Output: {output_tokens} tokens, Total: {total_tokens} tokens")
-    logger.info(f"LLM_METRICS - Generation time: {generation_time:.2f}s, Speed: {tokens_per_second:.2f} tokens/s")
 
 def log_model_loading_metrics(logger, duration):
     cpu_percent = psutil.cpu_percent()
