@@ -1,0 +1,5 @@
+Natural Language Processing (NLP) is a field that combines computational linguistics with machine learning and deep learning to help computers understand, interpret, and generate human language. NLP techniques are used in various applications like chatbots, translation services, and text analysis.
+
+Key NLP tasks include tokenization, part-of-speech tagging, named entity recognition, sentiment analysis, and language translation. Tokenization breaks text into individual words or tokens, while named entity recognition identifies specific entities like names, dates, and locations.
+
+Modern NLP heavily relies on transformer architectures and pre-trained language models like BERT, GPT, and T5. These models have revolutionized the field by achieving state-of-the-art results on many NLP benchmarks.

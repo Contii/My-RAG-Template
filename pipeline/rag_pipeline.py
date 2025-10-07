@@ -1,6 +1,7 @@
 import yaml
 import time
 from retriever.retriever import RetrieverStub
+from retriever.retriever import SemanticRetriever
 from generator.generator import GeneratorStub, LLMGenerator
 from logger.logger import get_logger, log_generation_metrics
 
@@ -32,9 +33,26 @@ class RAGPipeline:
         self.temperature = self.config.get("temperature", 1.0)
         self.max_gpu_memory = self.config.get("max_gpu_memory", "3.8GB")
 
-        self.retriever = RetrieverStub()
+        # Initialize retriever based on configuration
+        if self.retriever_type == "semantic":
+            retrieval_config = self.config.get("retrieval", {})
+            self.retriever = SemanticRetriever(
+                data_path=self.data_path,
+                embeddings_path=retrieval_config.get("embeddings_path", "data/embeddings"),
+                model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
+                top_k=retrieval_config.get("top_k", 3)
+            )
+        else:
+            self.retriever = RetrieverStub()
+
+        # Initialize generator based on configuration
         if self.generator_type == "llm":
-            self.generator = LLMGenerator(self.llm_model, self.max_tokens, self.temperature, self.max_gpu_memory)
+            self.generator = LLMGenerator(
+                self.llm_model,
+                self.max_tokens,
+                self.temperature,
+                self.max_gpu_memory
+            )
         else:
             self.generator = GeneratorStub()
 

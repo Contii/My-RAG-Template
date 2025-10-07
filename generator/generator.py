@@ -42,7 +42,15 @@ class LLMGenerator:
     def generate(self, context, question):
         logger.info("Generating answer with LLM")
         try:
-            prompt = f"{' '.join(context)}\nQuestion: {question}\nAnswer:"
+            if not context or len(context) == 0:
+                # LLM Mode - No context provided
+                prompt = f"Question: {question}\nAnswer:"
+            else:
+                # RAG Mode - Using only provided context
+                context_text = "\n\n".join(context)
+                prompt = f"""Based ONLY on the following context, answer the question. If the answer cannot be found in the context, say "I cannot answer this question based on the provided context."
+                \nContext:\n{context_text}\nQuestion: {question}\nAnswer:"""
+            
             inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
             
             # Count input tokens
