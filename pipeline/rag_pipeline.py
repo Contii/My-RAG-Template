@@ -1,7 +1,6 @@
 import yaml
 import time
-from retriever.retriever import RetrieverStub
-from retriever.retriever import SemanticRetriever
+from retriever.retriever import RetrieverStub, SemanticRetriever
 from generator.generator import GeneratorStub, LLMGenerator
 from logger.logger import get_logger, log_generation_metrics
 

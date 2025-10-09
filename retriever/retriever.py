@@ -4,6 +4,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 from logger.logger import get_logger
+from utils.document_parsers import ParserFactory
 
 logger = get_logger("retriever")
 
@@ -30,6 +31,7 @@ class SemanticRetriever:
         self.top_k = top_k
         
         logger.info(f"Initializing SemanticRetriever with model: {model_name}")
+        logger.info(f"Supported formats: {ParserFactory.supported_extensions()}")
         print(f"Initializing SemanticRetriever with model: {model_name}")
         
         # Load sentence transformer model
@@ -47,7 +49,7 @@ class SemanticRetriever:
         self._load_or_create_embeddings()
     
     def _load_documents(self):
-        """Load documents from the data directory."""
+        """Load documents from multiple formats using appropriate parsers."""
         logger.info(f"Loading documents from {self.data_path}")
         
         if not os.path.exists(self.data_path):
@@ -55,28 +57,45 @@ class SemanticRetriever:
             return
         
         documents = []
+        supported_extensions = ParserFactory.supported_extensions()
+
         for filename in os.listdir(self.data_path):
-            if filename.endswith('.txt'):
-                file_path = os.path.join(self.data_path, filename)
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read().strip()
-                        if content:
-                            # Simple sentence splitting into chunks
-                            chunks = self._chunk_text(content)
-                            for i, chunk in enumerate(chunks):
-                                doc_info = {
-                                    'content': chunk,
-                                    'source': filename,
-                                    'chunk_id': i
-                                }
-                                documents.append(doc_info)
-                    logger.info(f"Loaded {len(chunks)} chunks from {filename}")
-                except Exception as e:
-                    logger.error(f"Error loading file {filename}: {e}")
+            file_path = os.path.join(self.data_path, filename)
+            
+            # Skip directories
+            if os.path.isdir(file_path):
+                continue
+            
+            # Check if file extension is supported
+            _, ext = os.path.splitext(filename.lower())
+            if ext not in supported_extensions:
+                logger.warning(f"Skipping unsupported file: {filename}")
+                continue
+            
+            # Parse document
+            parser = ParserFactory.get_parser(file_path)
+            if parser:
+                content = parser.parse(file_path)
+                
+                if content:
+                    # Split into chunks
+                    chunks = self._chunk_text(content)
+                    for i, chunk in enumerate(chunks):
+                        doc_info = {
+                            'content': chunk,
+                            'source': filename,
+                            'chunk_id': i,
+                            'file_type': ext,
+                            'file_path': file_path
+                        }
+                        documents.append(doc_info)
+                    logger.info(f"Loaded {len(chunks)} chunks from {filename} ({ext})")
+                else:
+                    logger.warning(f"No content extracted from {filename}")
         
         self.documents = documents
-        logger.info(f"Total documents loaded: {len(self.documents)}")
+        logger.info(f"Total documents loaded: {len(self.documents)} from {len(set(d['source'] for d in documents))} files")
+    
     
     def _chunk_text(self, text, chunk_size=300, overlap=50):
         """Simple text chunking by character count."""
