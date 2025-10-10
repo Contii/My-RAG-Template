@@ -1,5 +1,7 @@
 docs/*
 !docs/INSTALL.md
+!docs/USAGE_EXAMPLES.md
+!docs/ARCHITECTURE.md
 
 logs/
 *.log

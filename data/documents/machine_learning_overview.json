@@ -1,0 +1,14 @@
+{
+  "title": "Machine Learning Overview",
+  "content": "Machine learning is a powerful subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed.",
+  "key_concepts": [
+    "Supervised Learning: Uses labeled data to train models",
+    "Unsupervised Learning: Finds patterns in unlabeled data", 
+    "Reinforcement Learning: Learns through interaction and rewards"
+  ],
+  "applications": {
+    "computer_vision": "Image recognition and object detection",
+    "natural_language": "Text analysis and language understanding",
+    "recommendation": "Personalized content and product suggestions"
+  }
+}

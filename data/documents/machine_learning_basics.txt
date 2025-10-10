@@ -1,0 +1,5 @@
+Machine learning is a subset of artificial intelligence that focuses on developing algorithms and statistical models that enable computers to improve their performance on tasks through experience. Instead of being explicitly programmed for every scenario, machine learning systems learn patterns from data.
+
+Common types of machine learning include supervised learning, unsupervised learning, and reinforcement learning. Supervised learning uses labeled data to train models, unsupervised learning finds patterns in unlabeled data, and reinforcement learning learns through interaction with an environment.
+
+Popular machine learning algorithms include linear regression, decision trees, random forests, support vector machines, and neural networks. Each algorithm has different strengths and is suitable for different types of problems.
