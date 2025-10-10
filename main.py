@@ -2,7 +2,7 @@ import time
 import warnings
 from datetime import datetime, timedelta
 from pipeline.rag_pipeline import RAGPipeline
-from logger.logger import setup_logger, get_logger, log_model_loading_metrics
+from logger.logger import setup_logger, get_logger, log_model_loading_metrics, close_metrics_session
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -67,14 +67,35 @@ def main():
     log_model_loading_metrics(logger, end_load - start_load)
     print(f"LLM loaded in {end_load - start_load:.2f} seconds.")
 
-    print("Type your questions below (type 'exit' to quit):")
+    print("\nType your questions below (type 'exit' to quit, 'metrics' to see dashboard):")
     print("--------------------------------------------------")
+    
     while True:
         question = input("\nQuestion: ")
+        
         if question.strip().lower() == "exit":
+            # Save final metrics report before exit
+            if hasattr(pipeline.retriever, 'save_metrics_report'):
+                pipeline.retriever.save_metrics_report()
+                print("📊 Metrics report saved to logs/retrieval_report.txt")
+            
+            close_metrics_session()
             logger.info("Exiting application.")
             print("Exiting...")
             break
+        
+        if question.strip().lower() == "metrics":
+            if hasattr(pipeline.retriever, 'print_metrics_dashboard'):
+                pipeline.retriever.print_metrics_dashboard()
+                
+                insights = pipeline.retriever.get_performance_insights()
+                if insights and any('tracking is disabled' not in insight for insight in insights):
+                    print("\n💡 PERFORMANCE INSIGHTS:")
+                    for insight in insights:
+                        print(f"   {insight}")
+            else:
+                print("Metrics not available for this retriever type")
+            continue
 
         logger.info(f"Received question: {question}")
         

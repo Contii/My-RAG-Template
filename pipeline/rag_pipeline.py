@@ -55,7 +55,7 @@ class RAGPipeline:
             )
             logger.info("SmartRetriever initialized with all optional components")
 
-        # Legacy retrievers    
+        # Legacy retrievers
         elif self.retriever_type == "filtered":
             retrieval_config = self.config.get("retrieval", {})
             from retriever.filtered_retriever import FilteredRetriever
@@ -70,6 +70,8 @@ class RAGPipeline:
                 enable_cache=retrieval_config.get("enable_cache", True),
                 min_score_threshold=retrieval_config.get("min_score_threshold", 0.3)
             )
+            logger.info("Legacy FilteredRetriever initialized")
+            
         elif self.retriever_type == "cache":
             retrieval_config = self.config.get("retrieval", {})
             from retriever.cache_retriever import CacheRetriever
@@ -83,6 +85,8 @@ class RAGPipeline:
                 cache_ttl_hours=retrieval_config.get("cache_ttl_hours", 24),
                 enable_cache=retrieval_config.get("enable_cache", True)
             )
+            logger.info("Legacy CacheRetriever initialized")
+            
         elif self.retriever_type == "reranking":
             retrieval_config = self.config.get("retrieval", {})
             from retriever.reranking_retriever import RerankingRetriever
@@ -94,6 +98,8 @@ class RAGPipeline:
                 top_k=retrieval_config.get("top_k", 3),
                 rerank_top_k=retrieval_config.get("rerank_top_k", 10)
             )
+            logger.info("Legacy RerankingRetriever initialized")
+            
         elif self.retriever_type == "semantic":
             retrieval_config = self.config.get("retrieval", {})
             from retriever.semantic_retriever import SemanticRetriever
@@ -103,8 +109,11 @@ class RAGPipeline:
                 model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
                 top_k=retrieval_config.get("top_k", 3)
             )
+            logger.info("Legacy SemanticRetriever initialized")
+            
         else:
             self.retriever = RetrieverStub()
+            logger.info("Stub retriever initialized")
 
         # Initialize generator based on configuration
         if self.generator_type == "llm":
@@ -117,7 +126,7 @@ class RAGPipeline:
         else:
             self.generator = GeneratorStub()
 
-        logger.info(f"Configured retriever: {self.retriever_type}, generator: {self.generator_type}")
+        logger.info(f"Pipeline configured - Retriever: {self.retriever_type}, Generator: {self.generator_type}")
 
     def run(self, question, filters=None):
         """Run pipeline with optional filters."""
@@ -138,13 +147,8 @@ class RAGPipeline:
                     min_score=filters.get('min_score')
                 )
             else:
+                # Basic retrieve for legacy retrievers
                 context = self.retriever.retrieve(question)
-                
-            print(f"Retriever type: {self.retriever_type}")
-            print(f"Generator type: {self.generator_type}")
-            print(f"Data path: {self.data_path}")
-        else:
-            context = []
         
         print(f"Using LLM model: {self.llm_model}")
         print(f"Max tokens: {self.max_tokens}")
@@ -157,9 +161,6 @@ class RAGPipeline:
         # Print metrics if SmartRetriever with metrics enabled
         if hasattr(self.retriever, 'print_metrics_dashboard'):
             self.retriever.print_metrics_dashboard()
-        # Legacy metrics for older retrievers
-        elif hasattr(self.retriever, 'print_metrics'):
-            self.retriever.print_metrics()
         
         # Print filter info if available
         if hasattr(self.retriever, 'print_filter_info') and filters:

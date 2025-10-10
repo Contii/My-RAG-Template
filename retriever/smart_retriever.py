@@ -1,10 +1,11 @@
 import time
 import hashlib
+from datetime import datetime
 from sentence_transformers import CrossEncoder
 from retriever.semantic_retriever import SemanticRetriever
 from utils.retrieval_metrics import RetrievalMetrics
 from utils.query_cache import QueryCache
-from logger.logger import get_logger
+from logger.logger import get_logger, log_retrieval_metrics
 
 logger = get_logger("smart_retriever")
 
@@ -54,15 +55,16 @@ class SmartRetriever:
     
     def retrieve(self, query, file_types=None, sources=None, min_score=None):
         """Main retrieval method with all optional features."""
-
-        # Start metrics tracking (if enabled)
+        start_time = time.time()
+        component_times = {}
+        cache_hit = None
+        
+        # Start detailed metrics tracking (if enabled)
         query_data = None
         if self.metrics:
             query_data = self.metrics.start_query(query, "SmartRetriever")
         
         try:
-            start_time = time.time()
-            
             # Build cache key including filters
             cache_key = self._build_cache_key(query, file_types, sources, min_score)
             
@@ -71,11 +73,18 @@ class SmartRetriever:
                 cache_start = time.time()
                 cached_result = self.cache.get(cache_key)
                 cache_time = time.time() - cache_start
+                component_times['cache_check'] = cache_time
                 
                 if self.metrics:
                     self.metrics.log_component_time(query_data, 'cache_check', cache_time)
                 
                 if cached_result:
+                    cache_hit = True
+                    total_time = time.time() - start_time
+                    
+                    # Log to both systems
+                    log_retrieval_metrics(logger, total_time, component_times, len(cached_result), cache_hit)
+                    
                     if self.metrics:
                         self.metrics.log_cache_hit(query_data, True)
                         self.metrics.log_results(query_data, cached_result)
@@ -84,6 +93,7 @@ class SmartRetriever:
                     logger.info(f"Cache hit for: {query[:30]}...")
                     return cached_result
                 else:
+                    cache_hit = False
                     if self.metrics:
                         self.metrics.log_cache_hit(query_data, False)
             
@@ -93,6 +103,7 @@ class SmartRetriever:
             semantic_start = time.time()
             semantic_results = self.base_retriever.retrieve(query)
             semantic_time = time.time() - semantic_start
+            component_times['semantic_search'] = semantic_time
             
             if self.metrics:
                 self.metrics.log_component_time(query_data, 'semantic_search', semantic_time)
@@ -105,6 +116,7 @@ class SmartRetriever:
                 filter_start = time.time()
                 candidates = self._apply_filters(candidates, file_types, sources, min_score)
                 filter_time = time.time() - filter_start
+                component_times['filtering'] = filter_time
                 
                 if self.metrics:
                     self.metrics.log_component_time(query_data, 'filtering', filter_time)
@@ -116,6 +128,7 @@ class SmartRetriever:
                 rerank_start = time.time()
                 candidates = self._rerank_candidates(query, candidates)
                 rerank_time = time.time() - rerank_start
+                component_times['reranking'] = rerank_time
                 
                 if self.metrics:
                     self.metrics.log_component_time(query_data, 'reranking', rerank_time)
@@ -130,27 +143,37 @@ class SmartRetriever:
                 cache_save_start = time.time()
                 self.cache.set(cache_key, final_results)
                 cache_save_time = time.time() - cache_save_start
+                component_times['cache_save'] = cache_save_time
                 
                 if self.metrics:
                     self.metrics.log_component_time(query_data, 'cache_save', cache_save_time)
             
-            # Log final results
+            # Final timing and logging
+            total_time = time.time() - start_time
+            
+            # Log to integrated logger (system + component metrics)
+            log_retrieval_metrics(logger, total_time, component_times, len(final_results), cache_hit)
+            
+            # Log to detailed metrics (if enabled)
             if self.metrics:
                 self.metrics.log_results(query_data, final_results)
                 self.metrics.finish_query(query_data)
             
-            response_time = time.time() - start_time
-            logger.info(f"Retrieval completed in {response_time:.3f}s, returned {len(final_results)} results")
+            logger.info(f"Retrieval completed in {total_time:.3f}s, returned {len(final_results)} results")
             
             return final_results
             
         except Exception as e:
-            logger.error(f"Error during retrieval: {e}")
+            total_time = time.time() - start_time
+            
+            # Log error to both systems
+            log_retrieval_metrics(logger, total_time, component_times, 0, cache_hit)
             
             if self.metrics and query_data:
                 self.metrics.log_error(query_data, e)
                 self.metrics.finish_query(query_data)
             
+            logger.error(f"Error during retrieval: {e}")
             raise
     
     def _parse_semantic_results(self, semantic_results):
@@ -284,48 +307,24 @@ class SmartRetriever:
     def get_available_sources(self):
         return list(set(doc.get('source', 'unknown') for doc in self.base_retriever.documents))
     
-    def get_metrics(self):
-        """Get performance metrics."""
-        cache_hit_rate = 0.0
-        if self.metrics['total_queries'] > 0:
-            cache_hit_rate = self.metrics['cache_hits'] / self.metrics['total_queries']
-        
-        return {
-            **self.metrics,
-            'cache_hit_rate': f"{cache_hit_rate:.1%}",
-            'components': {
-                'reranking': self.use_reranking,
-                'caching': self.use_cache, 
-                'filtering': self.use_filters
-            }
-        }
-    
-    def print_metrics(self):
-        """Print formatted performance metrics."""
-        metrics = self.get_metrics()
-        print("\n=== SMART RETRIEVER METRICS ===")
-        print(f"Total Queries: {metrics['total_queries']}")
-        print(f"Cache Hit Rate: {metrics['cache_hit_rate']}")
-        print(f"Components: {metrics['components']}")
-        print("==============================\n")
-
+    # Metrics methods - unified interface
     def print_metrics_dashboard(self):
         """Print metrics dashboard if metrics are enabled."""
         if self.metrics:
             self.metrics.print_dashboard()
         else:
-            print("Metrics tracking is disabled")
+            print("Detailed metrics tracking is disabled")
     
     def get_performance_insights(self):
         """Get performance insights if metrics are enabled."""
         if self.metrics:
             return self.metrics.get_performance_insights()
-        return ["Metrics tracking is disabled"]
+        return ["Detailed metrics tracking is disabled"]
     
     def save_metrics_report(self, filepath="logs/retrieval_report.txt"):
         """Save detailed metrics report if metrics are enabled."""
         if not self.metrics:
-            logger.info("Metrics tracking disabled, no report to save")
+            logger.info("Detailed metrics tracking disabled, no report to save")
             return
         
         try:
