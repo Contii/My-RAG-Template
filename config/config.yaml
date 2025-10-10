@@ -1,5 +1,5 @@
 llm_model: "microsoft/bitnet-b1.58-2B-4T"
-retriever_type: "filtered"
+retriever_type: "smart"
 generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
@@ -11,12 +11,18 @@ retrieval:
   model_name: "all-MiniLM-L6-v2"
   top_k: 3
   embeddings_path: "data/embeddings"
+  
+  # Component flags - turn on/off features
+  use_reranking: true
+  use_cache: true  
+  use_filters: true
+  
+  # Component configurations
   reranker_model: "ms-marco-MiniLM-L-12-v2"
   rerank_top_k: 10
-  enable_cache: true
   cache_ttl_hours: 24
   min_score_threshold: 0.3
-  
+
 # Logging configuration
 logging:
   level: "INFO"
