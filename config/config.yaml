@@ -1,5 +1,5 @@
 llm_model: "microsoft/bitnet-b1.58-2B-4T"
-retriever_type: "semantic"
+retriever_type: "reranking"
 generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
@@ -11,6 +11,8 @@ retrieval:
   model_name: "all-MiniLM-L6-v2"
   top_k: 3
   embeddings_path: "data/embeddings"
+  reranker_model: "ms-marco-MiniLM-L-12-v2"
+  rerank_top_k: 10
 
 # Logging configuration
 logging:
