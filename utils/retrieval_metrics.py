@@ -143,18 +143,15 @@ class RetrievalMetrics:
         """Print metrics dashboard."""
         summary = self.get_session_summary()
         
-        print("\n" + "="*50)
-        print("           RETRIEVAL METRICS DASHBOARD")
-        print("="*50)
+        print("\n" + "="*40)
+        print("    📊 RETRIEVAL METRICS DASHBOARD")
+        print("="*40)
         
         # Basic stats
         print(f"📊 Total Queries: {summary.get('total_queries', 0)}")
         print(f"⏱️  Avg Response Time: {summary.get('avg_response_time', 0):.3f}s")
         print(f"📄 Avg Results/Query: {summary.get('avg_results_per_query', 0):.1f}")
-        
-        # Cache performance
-        cache_hit_rate = summary.get('cache_hit_rate', 0)
-        print(f"💾 Cache Hit Rate: {cache_hit_rate:.1%}")
+        print(f"💾 Cache Hit Rate: {summary.get('cache_hit_rate', '0%')}")
         
         # Component timings
         if summary.get('component_avg_times'):
@@ -168,7 +165,7 @@ class RetrievalMetrics:
             for error_type, count in self.session_metrics['error_counts'].items():
                 print(f"   {error_type}: {count}")
         
-        print("="*50 + "\n")
+        print("="*40 + "\n")
     
     def get_performance_insights(self):
         """Generate performance insights."""

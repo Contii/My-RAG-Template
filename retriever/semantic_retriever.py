@@ -188,7 +188,7 @@ class SemanticRetriever:
     def retrieve(self, query):
         """Retrieve most relevant documents for the given query."""
         logger.info(f"Retrieving documents for query: {query[:50]}...")
-        print(f"Retrieving documents for query: {query[:50]}...")
+        print(f"\nRetrieving documents for query: {query[:50]}...")
         
         if not self.documents or self.index is None:
             logger.warning("No documents or index available")

@@ -15,7 +15,7 @@ class SmartRetriever:
     def __init__(self, data_path="data/documents", embeddings_path="data/embeddings",
                  model_name="all-MiniLM-L6-v2", top_k=3,
                  # Optional components
-                 use_reranking=True, reranker_model="ms-marco-MiniLM-L-12-v2", rerank_top_k=10,
+                 use_reranking=True, reranker_model="cross-encoder/ms-marco-MiniLM-L12-v2", rerank_top_k=10,
                  use_cache=True, cache_ttl_hours=24,
                  use_filters=True, min_score_threshold=0.3,
                  use_metrics=True):
@@ -53,8 +53,8 @@ class SmartRetriever:
         
         logger.info(f"SmartRetriever initialized - Rerank: {use_reranking}, Cache: {use_cache}, Filters: {use_filters}")
     
-    def retrieve(self, query, file_types=None, sources=None, min_score=None):
-        """Main retrieval method with all optional features."""
+    def retrieve(self, query, file_types=None, sources=None, min_score=None, date_from=None, date_to=None):
+        """Main retrieval method with all optional features including date filtering."""
         start_time = time.time()
         component_times = {}
         cache_hit = None
@@ -65,8 +65,8 @@ class SmartRetriever:
             query_data = self.metrics.start_query(query, "SmartRetriever")
         
         try:
-            # Build cache key including filters
-            cache_key = self._build_cache_key(query, file_types, sources, min_score)
+            # Build cache key including ALL filters
+            cache_key = self._build_cache_key(query, file_types, sources, min_score, date_from, date_to)
             
             # 1. Check cache first (if enabled)
             if self.use_cache and cache_key:
@@ -112,9 +112,9 @@ class SmartRetriever:
             candidates = self._parse_semantic_results(semantic_results)
             
             # 3. Apply filters early (if enabled)
-            if self.use_filters and (file_types or sources or min_score):
+            if self.use_filters and (file_types or sources or min_score or date_from or date_to):
                 filter_start = time.time()
-                candidates = self._apply_filters(candidates, file_types, sources, min_score)
+                candidates = self._apply_filters(candidates, file_types, sources, min_score, date_from, date_to)
                 filter_time = time.time() - filter_start
                 component_times['filtering'] = filter_time
                 
@@ -196,8 +196,8 @@ class SmartRetriever:
         
         return candidates
     
-    def _apply_filters(self, candidates, file_types, sources, min_score):
-        """Apply metadata filters to candidates."""
+    def _apply_filters(self, candidates, file_types, sources, min_score, date_from=None, date_to=None):
+        """Apply metadata filters to candidates including date filtering."""
         filtered = []
         min_threshold = min_score or self.min_score_threshold
         
@@ -205,13 +205,35 @@ class SmartRetriever:
             score = candidate['semantic_score']
             metadata = candidate['metadata']
             
-            # Apply filters
+            # Apply score filter
             if score < min_threshold:
                 continue
+                
+            # Apply file type filter
             if file_types and metadata.get('file_type') not in file_types:
                 continue
+                
+            # Apply source filter
             if sources and metadata.get('source') not in sources:
                 continue
+            
+            # Apply date filters
+            if date_from or date_to:
+                doc_date = metadata.get('date') or metadata.get('created_at') or metadata.get('modified_at')
+                if doc_date:
+                    try:
+                        from datetime import datetime
+                        if isinstance(doc_date, str):
+                            # Try to parse date string
+                            doc_date = datetime.fromisoformat(doc_date.replace('Z', '+00:00'))
+                        
+                        if date_from and doc_date < date_from:
+                            continue
+                        if date_to and doc_date > date_to:
+                            continue
+                    except (ValueError, TypeError):
+                        # If date parsing fails, skip date filtering for this document
+                        logger.warning(f"Could not parse date for document: {doc_date}")
             
             filtered.append(candidate)
         
@@ -259,7 +281,7 @@ class SmartRetriever:
         
         return results
     
-    def _build_cache_key(self, query, file_types, sources, min_score):
+    def _build_cache_key(self, query, file_types, sources, min_score, date_from=None, date_to=None):
         """Build cache key including all parameters."""
         if not self.use_cache:
             return None
@@ -269,6 +291,8 @@ class SmartRetriever:
             'file_types': sorted(file_types) if file_types else None,
             'sources': sorted(sources) if sources else None,
             'min_score': min_score,
+            'date_from': date_from.isoformat() if date_from else None,
+            'date_to': date_to.isoformat() if date_to else None,
             'use_reranking': self.use_reranking,
             'use_filters': self.use_filters
         }

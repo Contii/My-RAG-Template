@@ -11,7 +11,7 @@ class RerankingRetriever(SemanticRetriever):
     """
     
     def __init__(self, data_path="data/documents", embeddings_path="data/embeddings", 
-                 model_name="all-MiniLM-L6-v2", reranker_model="ms-marco-MiniLM-L-12-v2", 
+                 model_name="all-MiniLM-L6-v2", reranker_model="cross-encoder/ms-marco-MiniLM-L12-v2", 
                  top_k=3, rerank_top_k=10):
         super().__init__(data_path, embeddings_path, model_name, top_k)
         

@@ -19,7 +19,7 @@ retrieval:
   use_metrics: true
   
   # Component configurations
-  reranker_model: "ms-marco-MiniLM-L-12-v2"
+  reranker_model: "cross-encoder/ms-marco-MiniLM-L12-v2"
   rerank_top_k: 10
   cache_ttl_hours: 24
   min_score_threshold: 0.3

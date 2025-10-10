@@ -48,7 +48,7 @@ class RAGPipeline:
                 use_filters=retrieval_config.get("use_filters", True),
                 use_metrics=retrieval_config.get("use_metrics", True),
                 # Component configurations
-                reranker_model=retrieval_config.get("reranker_model", "ms-marco-MiniLM-L-12-v2"),
+                reranker_model=retrieval_config.get("reranker_model", "cross-encoder/ms-marco-MiniLM-L12-v2"),
                 rerank_top_k=retrieval_config.get("rerank_top_k", 10),
                 cache_ttl_hours=retrieval_config.get("cache_ttl_hours", 24),
                 min_score_threshold=retrieval_config.get("min_score_threshold", 0.3)
@@ -63,7 +63,7 @@ class RAGPipeline:
                 data_path=self.data_path,
                 embeddings_path=retrieval_config.get("embeddings_path", "data/embeddings"),
                 model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
-                reranker_model=retrieval_config.get("reranker_model", "ms-marco-MiniLM-L-12-v2"),
+                reranker_model=retrieval_config.get("reranker_model", "cross-encoder/ms-marco-MiniLM-L12-v2"),
                 top_k=retrieval_config.get("top_k", 3),
                 rerank_top_k=retrieval_config.get("rerank_top_k", 10),
                 cache_ttl_hours=retrieval_config.get("cache_ttl_hours", 24),
@@ -79,7 +79,7 @@ class RAGPipeline:
                 data_path=self.data_path,
                 embeddings_path=retrieval_config.get("embeddings_path", "data/embeddings"),
                 model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
-                reranker_model=retrieval_config.get("reranker_model", "ms-marco-MiniLM-L-12-v2"),
+                reranker_model=retrieval_config.get("reranker_model", "cross-encoder/ms-marco-MiniLM-L12-v2"),
                 top_k=retrieval_config.get("top_k", 3),
                 rerank_top_k=retrieval_config.get("rerank_top_k", 10),
                 cache_ttl_hours=retrieval_config.get("cache_ttl_hours", 24),
@@ -94,7 +94,7 @@ class RAGPipeline:
                 data_path=self.data_path,
                 embeddings_path=retrieval_config.get("embeddings_path", "data/embeddings"),
                 model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
-                reranker_model=retrieval_config.get("reranker_model", "ms-marco-MiniLM-L-12-v2"),
+                reranker_model=retrieval_config.get("reranker_model", "cross-encoder/ms-marco-MiniLM-L12-v2"),
                 top_k=retrieval_config.get("top_k", 3),
                 rerank_top_k=retrieval_config.get("rerank_top_k", 10)
             )
@@ -135,6 +135,8 @@ class RAGPipeline:
             logger.error(f"Invalid question received: {question}")
             raise ValueError("Question must be a non-empty string.")
         
+        context = []
+        
         if self.use_rag:
             # SmartRetriever and FilteredRetriever support filters
             if hasattr(self.retriever, 'get_available_file_types') and filters:
@@ -150,10 +152,12 @@ class RAGPipeline:
                 # Basic retrieve for legacy retrievers
                 context = self.retriever.retrieve(question)
         
+        # Show system info
         print(f"Using LLM model: {self.llm_model}")
         print(f"Max tokens: {self.max_tokens}")
         print(f"Temperature: {self.temperature}")
         
+        # Generate answer
         answer, generation_time = self.generator.generate(context, question)
         logger.info(f"Answer generated: {answer}")
         log_generation_metrics(logger, generation_time)
@@ -162,10 +166,6 @@ class RAGPipeline:
         if hasattr(self.retriever, 'print_metrics_dashboard'):
             self.retriever.print_metrics_dashboard()
         
-        # Print filter info if available
-        if hasattr(self.retriever, 'print_filter_info') and filters:
-            self.retriever.print_filter_info()
-        
         # Performance insights for SmartRetriever
         if hasattr(self.retriever, 'get_performance_insights'):
             insights = self.retriever.get_performance_insights()
@@ -173,6 +173,10 @@ class RAGPipeline:
                 print("\n💡 PERFORMANCE INSIGHTS:")
                 for insight in insights:
                     print(f"   {insight}")
+        
+        # Print filter info if available (after insights)
+        if hasattr(self.retriever, 'print_filter_info') and filters:
+            self.retriever.print_filter_info()
         
         return context, answer
 
