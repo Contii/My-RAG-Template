@@ -33,7 +33,21 @@ class RAGPipeline:
         self.max_gpu_memory = self.config.get("max_gpu_memory", "3.8GB")
 
         # Initialize retriever based on configuration
-        if self.retriever_type == "cache":
+        if self.retriever_type == "filtered":
+            retrieval_config = self.config.get("retrieval", {})
+            from retriever.filtered_retriever import FilteredRetriever
+            self.retriever = FilteredRetriever(
+                data_path=self.data_path,
+                embeddings_path=retrieval_config.get("embeddings_path", "data/embeddings"),
+                model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
+                reranker_model=retrieval_config.get("reranker_model", "ms-marco-MiniLM-L-12-v2"),
+                top_k=retrieval_config.get("top_k", 3),
+                rerank_top_k=retrieval_config.get("rerank_top_k", 10),
+                cache_ttl_hours=retrieval_config.get("cache_ttl_hours", 24),
+                enable_cache=retrieval_config.get("enable_cache", True),
+                min_score_threshold=retrieval_config.get("min_score_threshold", 0.3)
+            )
+        elif self.retriever_type == "cache":
             retrieval_config = self.config.get("retrieval", {})
             from retriever.cache_retriever import CacheRetriever
             self.retriever = CacheRetriever(
@@ -82,26 +96,46 @@ class RAGPipeline:
 
         logger.info(f"Configured retriever: {self.retriever_type}, generator: {self.generator_type}")
 
-    def run(self, question):
-        logger.info("Running RAG pipeline")
-        if not isinstance(question, str) or not question.strip():
-            logger.error(f"Invalid question received: {question}")
-            raise ValueError("Question must be a non-empty string.")
-        
-        if self.use_rag:
-            context = self.retriever.retrieve(question)
-            print(f"Retriever type: {self.retriever_type}")
-            print(f"Generator type: {self.generator_type}")
-            print(f"Data path: {self.data_path}")
-        else:
-            context = []
-        
-        print(f"Using LLM model: {self.llm_model}")
-        print(f"Max tokens: {self.max_tokens}")
-        print(f"Temperature: {self.temperature}")
-        
-        answer, generation_time = self.generator.generate(context, question)
-        logger.info(f"Answer generated: {answer}")
-        log_generation_metrics(logger, generation_time)
-        
-        return context, answer
+        def run(self, question, filters=None):
+            """Run pipeline with optional filters."""
+            logger.info("Running RAG pipeline")
+            if not isinstance(question, str) or not question.strip():
+                logger.error(f"Invalid question received: {question}")
+                raise ValueError("Question must be a non-empty string.")
+            
+            if self.use_rag:
+                # Apply filters if using filtered retriever
+                if hasattr(self.retriever, 'get_available_file_types') and filters:
+                    context = self.retriever.retrieve(
+                        question,
+                        file_types=filters.get('file_types'),
+                        sources=filters.get('sources'),
+                        date_from=filters.get('date_from'),
+                        date_to=filters.get('date_to'),
+                        min_score=filters.get('min_score')
+                    )
+                else:
+                    context = self.retriever.retrieve(question)
+                    
+                print(f"Retriever type: {self.retriever_type}")
+                print(f"Generator type: {self.generator_type}")
+                print(f"Data path: {self.data_path}")
+            else:
+                context = []
+            
+            print(f"Using LLM model: {self.llm_model}")
+            print(f"Max tokens: {self.max_tokens}")
+            print(f"Temperature: {self.temperature}")
+            
+            answer, generation_time = self.generator.generate(context, question)
+            logger.info(f"Answer generated: {answer}")
+            log_generation_metrics(logger, generation_time)
+            
+            # Print metrics and filter info if available
+            if hasattr(self.retriever, 'print_metrics'):
+                self.retriever.print_metrics()
+            
+            if hasattr(self.retriever, 'print_filter_info') and filters:
+                self.retriever.print_filter_info()
+            
+            return context, answer

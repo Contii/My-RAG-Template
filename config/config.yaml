@@ -1,5 +1,5 @@
 llm_model: "microsoft/bitnet-b1.58-2B-4T"
-retriever_type: "cache"
+retriever_type: "filtered"
 generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
@@ -15,7 +15,8 @@ retrieval:
   rerank_top_k: 10
   enable_cache: true
   cache_ttl_hours: 24
-
+  min_score_threshold: 0.3
+  
 # Logging configuration
 logging:
   level: "INFO"
