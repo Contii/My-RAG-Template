@@ -6,16 +6,17 @@ data_path: "data/documents/"
 temperature: 0.7
 max_gpu_memory: "3.8GB" # aprox 95% of 4GB GPU
 
-# Retrieval configuration
+# Smart Retriever configuration
 retrieval:
   model_name: "all-MiniLM-L6-v2"
   top_k: 3
   embeddings_path: "data/embeddings"
   
-  # Component flags - turn on/off features
+  # Enable/disable components
   use_reranking: true
-  use_cache: true  
+  use_cache: true
   use_filters: true
+  use_metrics: true
   
   # Component configurations
   reranker_model: "ms-marco-MiniLM-L-12-v2"

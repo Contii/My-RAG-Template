@@ -2,6 +2,7 @@ import time
 import hashlib
 from sentence_transformers import CrossEncoder
 from retriever.semantic_retriever import SemanticRetriever
+from utils.retrieval_metrics import RetrievalMetrics
 from utils.query_cache import QueryCache
 from logger.logger import get_logger
 
@@ -15,7 +16,8 @@ class SmartRetriever:
                  # Optional components
                  use_reranking=True, reranker_model="ms-marco-MiniLM-L-12-v2", rerank_top_k=10,
                  use_cache=True, cache_ttl_hours=24,
-                 use_filters=True, min_score_threshold=0.3):
+                 use_filters=True, min_score_threshold=0.3,
+                 use_metrics=True):
         
         # Base semantic retriever (always needed)
         self.base_retriever = SemanticRetriever(data_path, embeddings_path, model_name, top_k)
@@ -40,60 +42,116 @@ class SmartRetriever:
         if use_filters:
             logger.info("Filtering enabled")
         
-        # Metrics
-        self.metrics = {'total_queries': 0, 'cache_hits': 0, 'cache_misses': 0}
+        # Optional metrics
+        self.use_metrics = use_metrics
+        if use_metrics:
+            self.metrics = RetrievalMetrics()
+            logger.info("Metrics tracking enabled")
+        else:
+            self.metrics = None
         
         logger.info(f"SmartRetriever initialized - Rerank: {use_reranking}, Cache: {use_cache}, Filters: {use_filters}")
     
     def retrieve(self, query, file_types=None, sources=None, min_score=None):
         """Main retrieval method with all optional features."""
-        start_time = time.time()
-        self.metrics['total_queries'] += 1
+
+        # Start metrics tracking (if enabled)
+        query_data = None
+        if self.metrics:
+            query_data = self.metrics.start_query(query, "SmartRetriever")
         
-        # Build cache key including filters
-        cache_key = self._build_cache_key(query, file_types, sources, min_score)
-        
-        # 1. Check cache first (if enabled)
-        if self.use_cache and cache_key:
-            cached_result = self.cache.get(cache_key)
-            if cached_result:
-                self.metrics['cache_hits'] += 1
-                logger.info(f"Cache hit for: {query[:30]}...")
-                return cached_result
-            else:
-                self.metrics['cache_misses'] += 1
-        
-        logger.info(f"Processing query: {query[:50]}...")
-        
-        # 2. Get initial candidates from semantic search
-        # Get more candidates if we're going to rerank
-        semantic_results = self.base_retriever.retrieve(query)
-        
-        # Convert to candidates format for processing
-        candidates = self._parse_semantic_results(semantic_results)
-        
-        # 3. Apply filters early (if enabled)
-        if self.use_filters and (file_types or sources or min_score):
-            candidates = self._apply_filters(candidates, file_types, sources, min_score)
-            logger.info(f"Applied filters, {len(candidates)} candidates remain")
-        
-        # 4. Rerank candidates (if enabled)
-        if self.use_reranking and len(candidates) > 1:
-            candidates = self._rerank_candidates(query, candidates)
-            logger.info("Reranking completed")
-        
-        # 5. Take final top-k and format results
-        final_results = self._format_results(candidates[:self.top_k])
-        
-        # 6. Cache the final result (if enabled)
-        if self.use_cache and cache_key:
-            self.cache.set(cache_key, final_results)
-        
-        response_time = time.time() - start_time
-        logger.info(f"Retrieval completed in {response_time:.3f}s, returned {len(final_results)} results")
-        print(f"Retrieval completed in {response_time:.3f}s, returned {len(final_results)} results")
-        
-        return final_results
+        try:
+            start_time = time.time()
+            
+            # Build cache key including filters
+            cache_key = self._build_cache_key(query, file_types, sources, min_score)
+            
+            # 1. Check cache first (if enabled)
+            if self.use_cache and cache_key:
+                cache_start = time.time()
+                cached_result = self.cache.get(cache_key)
+                cache_time = time.time() - cache_start
+                
+                if self.metrics:
+                    self.metrics.log_component_time(query_data, 'cache_check', cache_time)
+                
+                if cached_result:
+                    if self.metrics:
+                        self.metrics.log_cache_hit(query_data, True)
+                        self.metrics.log_results(query_data, cached_result)
+                        self.metrics.finish_query(query_data)
+                    
+                    logger.info(f"Cache hit for: {query[:30]}...")
+                    return cached_result
+                else:
+                    if self.metrics:
+                        self.metrics.log_cache_hit(query_data, False)
+            
+            logger.info(f"Processing query: {query[:50]}...")
+            
+            # 2. Get initial candidates from semantic search
+            semantic_start = time.time()
+            semantic_results = self.base_retriever.retrieve(query)
+            semantic_time = time.time() - semantic_start
+            
+            if self.metrics:
+                self.metrics.log_component_time(query_data, 'semantic_search', semantic_time)
+            
+            # Convert to candidates format for processing
+            candidates = self._parse_semantic_results(semantic_results)
+            
+            # 3. Apply filters early (if enabled)
+            if self.use_filters and (file_types or sources or min_score):
+                filter_start = time.time()
+                candidates = self._apply_filters(candidates, file_types, sources, min_score)
+                filter_time = time.time() - filter_start
+                
+                if self.metrics:
+                    self.metrics.log_component_time(query_data, 'filtering', filter_time)
+                
+                logger.info(f"Applied filters, {len(candidates)} candidates remain")
+            
+            # 4. Rerank candidates (if enabled)
+            if self.use_reranking and len(candidates) > 1:
+                rerank_start = time.time()
+                candidates = self._rerank_candidates(query, candidates)
+                rerank_time = time.time() - rerank_start
+                
+                if self.metrics:
+                    self.metrics.log_component_time(query_data, 'reranking', rerank_time)
+                
+                logger.info("Reranking completed")
+            
+            # 5. Take final top-k and format results
+            final_results = self._format_results(candidates[:self.top_k])
+            
+            # 6. Cache the final result (if enabled)
+            if self.use_cache and cache_key:
+                cache_save_start = time.time()
+                self.cache.set(cache_key, final_results)
+                cache_save_time = time.time() - cache_save_start
+                
+                if self.metrics:
+                    self.metrics.log_component_time(query_data, 'cache_save', cache_save_time)
+            
+            # Log final results
+            if self.metrics:
+                self.metrics.log_results(query_data, final_results)
+                self.metrics.finish_query(query_data)
+            
+            response_time = time.time() - start_time
+            logger.info(f"Retrieval completed in {response_time:.3f}s, returned {len(final_results)} results")
+            
+            return final_results
+            
+        except Exception as e:
+            logger.error(f"Error during retrieval: {e}")
+            
+            if self.metrics and query_data:
+                self.metrics.log_error(query_data, e)
+                self.metrics.finish_query(query_data)
+            
+            raise
     
     def _parse_semantic_results(self, semantic_results):
         """Convert semantic results to internal candidate format."""
@@ -250,3 +308,45 @@ class SmartRetriever:
         print(f"Cache Hit Rate: {metrics['cache_hit_rate']}")
         print(f"Components: {metrics['components']}")
         print("==============================\n")
+
+    def print_metrics_dashboard(self):
+        """Print metrics dashboard if metrics are enabled."""
+        if self.metrics:
+            self.metrics.print_dashboard()
+        else:
+            print("Metrics tracking is disabled")
+    
+    def get_performance_insights(self):
+        """Get performance insights if metrics are enabled."""
+        if self.metrics:
+            return self.metrics.get_performance_insights()
+        return ["Metrics tracking is disabled"]
+    
+    def save_metrics_report(self, filepath="logs/retrieval_report.txt"):
+        """Save detailed metrics report if metrics are enabled."""
+        if not self.metrics:
+            logger.info("Metrics tracking disabled, no report to save")
+            return
+        
+        try:
+            summary = self.metrics.get_session_summary()
+            insights = self.get_performance_insights()
+            
+            with open(filepath, 'w') as f:
+                f.write("SMART RETRIEVER METRICS REPORT\n")
+                f.write("=" * 50 + "\n\n")
+                
+                f.write("SESSION SUMMARY:\n")
+                for key, value in summary.items():
+                    f.write(f"{key}: {value}\n")
+                
+                f.write("\nPERFORMANCE INSIGHTS:\n")
+                for insight in insights:
+                    f.write(f"{insight}\n")
+                
+                f.write(f"\nGenerated: {datetime.now().isoformat()}\n")
+            
+            logger.info(f"Metrics report saved to {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save metrics report: {e}")
