@@ -1,5 +1,5 @@
 llm_model: "microsoft/bitnet-b1.58-2B-4T"
-retriever_type: "reranking"
+retriever_type: "cache"
 generator_type: "llm"
 max_tokens: 250
 data_path: "data/documents/"
@@ -13,6 +13,8 @@ retrieval:
   embeddings_path: "data/embeddings"
   reranker_model: "ms-marco-MiniLM-L-12-v2"
   rerank_top_k: 10
+  enable_cache: true
+  cache_ttl_hours: 24
 
 # Logging configuration
 logging:

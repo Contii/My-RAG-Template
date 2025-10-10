@@ -6,7 +6,7 @@ import faiss
 from logger.logger import get_logger
 from utils.document_parsers import ParserFactory
 
-logger = get_logger("retriever")
+logger = get_logger("semantic_retriever")
 
 
 class RetrieverStub:

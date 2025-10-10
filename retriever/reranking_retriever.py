@@ -1,6 +1,6 @@
 import faiss
 from sentence_transformers import CrossEncoder
-from retriever.retriever import SemanticRetriever
+from retriever.semantic_retriever import SemanticRetriever
 from logger.logger import get_logger
 
 logger = get_logger("reranking_retriever")

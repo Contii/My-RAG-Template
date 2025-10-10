@@ -1,6 +1,6 @@
 import yaml
 import time
-from retriever.retriever import RetrieverStub, SemanticRetriever
+from retriever.semantic_retriever import RetrieverStub
 from generator.generator import GeneratorStub, LLMGenerator
 from logger.logger import get_logger, log_generation_metrics
 
@@ -33,7 +33,20 @@ class RAGPipeline:
         self.max_gpu_memory = self.config.get("max_gpu_memory", "3.8GB")
 
         # Initialize retriever based on configuration
-        if self.retriever_type == "reranking":
+        if self.retriever_type == "cache":
+            retrieval_config = self.config.get("retrieval", {})
+            from retriever.cache_retriever import CacheRetriever
+            self.retriever = CacheRetriever(
+                data_path=self.data_path,
+                embeddings_path=retrieval_config.get("embeddings_path", "data/embeddings"),
+                model_name=retrieval_config.get("model_name", "all-MiniLM-L6-v2"),
+                reranker_model=retrieval_config.get("reranker_model", "ms-marco-MiniLM-L-12-v2"),
+                top_k=retrieval_config.get("top_k", 3),
+                rerank_top_k=retrieval_config.get("rerank_top_k", 10),
+                cache_ttl_hours=retrieval_config.get("cache_ttl_hours", 24),
+                enable_cache=retrieval_config.get("enable_cache", True)
+            )
+        elif self.retriever_type == "reranking":
             retrieval_config = self.config.get("retrieval", {})
             from retriever.reranking_retriever import RerankingRetriever
             self.retriever = RerankingRetriever(
