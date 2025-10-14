@@ -3,6 +3,10 @@ docs/*
 !docs/USAGE_EXAMPLES.md
 !docs/ARCHITECTURE.md
 
+data/ragbench
+context.md
+cache/queries/*
+
 logs/
 *.log
 

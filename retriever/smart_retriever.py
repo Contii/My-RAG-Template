@@ -3,7 +3,7 @@ import hashlib
 from datetime import datetime
 from sentence_transformers import CrossEncoder
 from retriever.semantic_retriever import SemanticRetriever
-from utils.retrieval_metrics import RetrievalMetrics
+from utils.metrics.retrieval_metrics import RetrievalMetrics
 from utils.query_cache import QueryCache
 from logger.logger import get_logger, log_retrieval_metrics
 
