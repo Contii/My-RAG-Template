@@ -1,5 +1,6 @@
 import os
 import pickle
+import yaml
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from utils.document_parsers import ParserFactory
@@ -25,12 +26,13 @@ class SemanticRetriever:
     """
     
     def __init__(self, data_path="data/documents", embeddings_path="data/embeddings", 
-                 model_name="all-MiniLM-L6-v2", top_k=3):
+                 model_name="all-MiniLM-L6-v2", top_k=3, config_path="config/config.yaml"):
         self.data_path = data_path
         self.embeddings_path = embeddings_path
         self.model_name = model_name
         self.top_k = top_k
-        
+        self.config = self._load_config(config_path)
+
         logger.info(f"Initializing SemanticRetriever with model: {model_name}")
         logger.info(f"Supported formats: {ParserFactory.supported_extensions()}")
         print(f"Initializing SemanticRetriever with model: {model_name}")
@@ -40,7 +42,8 @@ class SemanticRetriever:
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
         
         # Initialize FAISS index
-        self.faiss_index = FAISSIndex(dimension=self.embedding_dim)
+        faiss_config = self.config.get('retrieval', {}).get('faiss', None)
+        self.faiss_index = FAISSIndex(dimension=self.embedding_dim, config=faiss_config)
 
         # Initialize document storage
         self.documents = []
@@ -52,6 +55,16 @@ class SemanticRetriever:
         # Load or create embeddings
         self._load_or_create_embeddings()
     
+    def _load_config(self, config_path):
+        """Load configuration from YAML file."""
+        try:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            return config
+        except Exception as e:
+            logger.error(f"Failed to load config from {config_path}: {e}")
+            return {}
+        
     def _load_documents(self):
         """Load documents from multiple formats using appropriate parsers."""
         logger.info(f"Loading documents from {self.data_path}")
@@ -211,7 +224,7 @@ class SemanticRetriever:
             
             # Prepare results
             results = []
-            for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+            for i, (idx, score) in enumerate(zip(indices, scores)):
                 if idx < len(self.documents):
                     doc = self.documents[idx]
                     result = f"[Score: {score:.3f}] {doc['content']}"

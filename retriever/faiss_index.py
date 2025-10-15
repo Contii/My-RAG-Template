@@ -14,16 +14,23 @@ Handles FAISS index operations independently from retrieval logic.
 class FAISSIndex:
     """Manages FAISS index operations with persistence."""
     
-    def __init__(self, dimension=384, metric="inner_product"):
+    def __init__(self, dimension=384, metric="inner_product", config=None):
         """
         Initialize FAISS index.
         
         Args:
             dimension: Embedding dimension
             metric: Distance metric ('inner_product' or 'L2')
+            config: Optional dict with FAISS configuration
         """
-        self.dimension = dimension
-        self.metric = metric
+
+        if config:
+            self.dimension = config.get('dimension', dimension)
+            self.metric = config.get('metric', metric)
+        else:
+            self.dimension = dimension
+            self.metric = metric
+
         self.index = self._create_index()
         self.embeddings_list = []  # Store embeddings for persistence
         
