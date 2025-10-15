@@ -24,6 +24,10 @@ retrieval:
   cache_ttl_hours: 24
   min_score_threshold: 0.3
 
+  faiss:
+    dimension: 384 # Ensure this matches your embedding model output dimension
+    metric: "inner_product"  # Options: "inner_product", "l2"
+
 # Logging configuration
 logging:
   level: INFO

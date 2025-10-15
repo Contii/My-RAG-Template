@@ -1,10 +1,12 @@
 import os
 import pickle
+import yaml
 import numpy as np
 from sentence_transformers import SentenceTransformer
-import faiss
-from logger.logger import get_logger
 from utils.document_parsers import ParserFactory
+from retriever.faiss_index import FAISSIndex
+from logger.logger import get_logger
+
 
 logger = get_logger("semantic_retriever")
 
@@ -24,23 +26,30 @@ class SemanticRetriever:
     """
     
     def __init__(self, data_path="data/documents", embeddings_path="data/embeddings", 
-                 model_name="all-MiniLM-L6-v2", top_k=3):
+                 model_name="all-MiniLM-L6-v2", top_k=3, config_path="config/config.yaml"):
         self.data_path = data_path
         self.embeddings_path = embeddings_path
         self.model_name = model_name
         self.top_k = top_k
-        
+        self.config = self._load_config(config_path)
+
         logger.info(f"Initializing SemanticRetriever with model: {model_name}")
         logger.info(f"Supported formats: {ParserFactory.supported_extensions()}")
         print(f"Initializing SemanticRetriever with model: {model_name}")
         
         # Load sentence transformer model
         self.model = SentenceTransformer(model_name)
+        self.embedding_dim = self.model.get_sentence_embedding_dimension()
         
+        # Initialize FAISS index
+        faiss_config = self.config.get('retrieval', {}).get('faiss', None)
+        self.faiss_index = FAISSIndex(dimension=self.embedding_dim, config=faiss_config)
+
+        logger.info(f"FAISS configuration: {self.faiss_index.get_stats()}")
+
         # Initialize document storage
         self.documents = []
         self.embeddings = None
-        self.index = None
         
         # Create embeddings directory if it doesn't exist
         os.makedirs(self.embeddings_path, exist_ok=True)
@@ -48,6 +57,16 @@ class SemanticRetriever:
         # Load or create embeddings
         self._load_or_create_embeddings()
     
+    def _load_config(self, config_path):
+        """Load configuration from YAML file."""
+        try:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            return config
+        except Exception as e:
+            logger.error(f"Failed to load config from {config_path}: {e}")
+            return {}
+        
     def _load_documents(self):
         """Load documents from multiple formats using appropriate parsers."""
         logger.info(f"Loading documents from {self.data_path}")
@@ -128,12 +147,12 @@ class SemanticRetriever:
         """Load existing embeddings or create new ones."""
         embeddings_file = os.path.join(self.embeddings_path, "embeddings.pkl")
         documents_file = os.path.join(self.embeddings_path, "documents.pkl")
-        index_file = os.path.join(self.embeddings_path, "faiss_index.bin")
+        faiss_file = os.path.join(self.embeddings_path, "faiss_index.pkl")
         
         # Check if embeddings exist
         if (os.path.exists(embeddings_file) and 
             os.path.exists(documents_file) and 
-            os.path.exists(index_file)):
+            os.path.exists(faiss_file)):
             logger.info("Loading existing embeddings...")
             print("Loading existing embeddings...")
             try:
@@ -143,7 +162,12 @@ class SemanticRetriever:
                 with open(embeddings_file, 'rb') as f:
                     self.embeddings = pickle.load(f)
                 
-                self.index = faiss.read_index(index_file)
+                # Load FAISS index using FAISSIndex class
+                self.faiss_index.load(faiss_file)
+                
+                stats = self.faiss_index.get_stats()
+                logger.info(f"FAISS index loaded: {stats}")
+
                 logger.info(f"Loaded {len(self.documents)} documents with embeddings")
                 print(f"Loaded {len(self.documents)} documents with embeddings successfully.")
                 return
@@ -164,13 +188,12 @@ class SemanticRetriever:
         
         self.embeddings = self.model.encode(texts, convert_to_numpy=True)
         
-        # Create FAISS index
-        dimension = self.embeddings.shape[1]
-        self.index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
+        # Add embeddings to FAISS index (handles normalization internally)
+        embeddings_array = np.array(self.embeddings).astype('float32')
+        self.faiss_index.add_embeddings(embeddings_array)
         
-        # Normalize embeddings for cosine similarity
-        faiss.normalize_L2(self.embeddings)
-        self.index.add(self.embeddings)
+        stats = self.faiss_index.get_stats()
+        logger.info(f"FAISS index built: {stats}")
         
         # Save embeddings and index
         try:
@@ -180,7 +203,9 @@ class SemanticRetriever:
             with open(embeddings_file, 'wb') as f:
                 pickle.dump(self.embeddings, f)
             
-            faiss.write_index(self.index, index_file)
+            # Save FAISS index using FAISSIndex class
+            self.faiss_index.save(faiss_file)
+            
             logger.info("Embeddings and index saved successfully")
         except Exception as e:
             logger.error(f"Error saving embeddings: {e}")
@@ -190,21 +215,26 @@ class SemanticRetriever:
         logger.info(f"Retrieving documents for query: {query[:50]}...")
         print(f"\nRetrieving documents for query: {query[:50]}...")
         
-        if not self.documents or self.index is None:
+        stats = self.faiss_index.get_stats()
+        logger.debug(f"FAISS stats - vectors: {stats['num_vectors']}, index_type: {stats['index_type']}")
+        
+        if not self.documents or self.faiss_index.is_empty():
             logger.warning("No documents or index available")
             return ["No documents available"]
         
         try:
             # Generate query embedding
             query_embedding = self.model.encode([query], convert_to_numpy=True)
-            faiss.normalize_L2(query_embedding)
+            query_embedding = query_embedding.astype('float32')
             
-            # Search for similar documents
-            scores, indices = self.index.search(query_embedding, self.top_k)
+            # Search using FAISSIndex
+            indices, scores = self.faiss_index.search(query_embedding, self.top_k)
             
+            logger.debug(f"Search completed - top_k: {self.top_k}, results: {len(indices)}")
+
             # Prepare results
             results = []
-            for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+            for i, (idx, score) in enumerate(zip(indices, scores)):
                 if idx < len(self.documents):
                     doc = self.documents[idx]
                     result = f"[Score: {score:.3f}] {doc['content']}"
@@ -219,3 +249,15 @@ class SemanticRetriever:
         except Exception as e:
             logger.error(f"Error during retrieval: {e}")
             return [f"Error during retrieval: {e}"]
+
+    def get_index_stats(self):
+        """Get FAISS index statistics."""
+        return self.faiss_index.get_stats()
+    
+    def rebuild_index(self):
+        """Rebuild the index from scratch."""
+        logger.info("Rebuilding index...")
+        self.faiss_index.clear()
+        self.embeddings = None
+        self._load_or_create_embeddings()
+        logger.info("Index rebuilt successfully")
