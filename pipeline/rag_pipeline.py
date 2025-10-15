@@ -1,7 +1,7 @@
 import yaml
 import time
 from retriever.semantic_retriever import RetrieverStub
-from generator.generator import GeneratorStub, LLMGenerator
+from generator.generator import GeneratorStub, HuggingFaceGenerator
 from logger.logger import get_logger, log_generation_metrics
 
 logger = get_logger("pipeline")
@@ -117,7 +117,7 @@ class RAGPipeline:
 
         # Initialize generator based on configuration
         if self.generator_type == "llm":
-            self.generator = LLMGenerator(
+            self.generator = HuggingFaceGenerator(
                 self.llm_model,
                 self.max_tokens,
                 self.temperature,

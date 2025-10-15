@@ -3,10 +3,11 @@ import time
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from logger.logger import get_logger, log_model_loading_metrics, log_generation_metrics
 from utils.metrics.generator_metrics import GeneratorMetrics
+from generator.base_generator import BaseGenerator
 
 logger = get_logger("generator")
 
-class GeneratorStub:
+class GeneratorStub(BaseGenerator):
     """
     Stub generator that returns a static answer.
     """
@@ -30,14 +31,27 @@ class GeneratorStub:
         self.metrics.finish_generation(gen_id, len(answer), duration)
         
         return answer, duration
-
-class LLMGenerator:
+    
+    def get_model_info(self):
+        """Return stub model information."""
+        return {
+            'type': 'stub',
+            'name': 'GeneratorStub',
+            'description': 'Static stub generator for testing'
+        }
+    
+    def count_tokens(self, text):
+        """Count tokens using simple split."""
+        return len(text.split())
+    
+class HuggingFaceGenerator(BaseGenerator):
     """
     Generator that uses a Hugging Face LLM to generate answers.
     """
     def __init__(self, model_id, max_tokens=250, temperature=0.7, max_gpu_memory="3.8GB"):
-        logger.info(f"Loading LLM model: {model_id}")
+        logger.info(f"Loading HuggingFace model: {model_id}") 
         self.metrics = GeneratorMetrics()
+        self.model_id = model_id
         
         try:
             start_load = time.time()
@@ -59,14 +73,15 @@ class LLMGenerator:
                 logger.info("GPU: Not available, using CPU")
                 
         except Exception as e:
-            logger.error(f"Error loading LLM model: {e}")
-            raise RuntimeError(f"Failed to load LLM model '{model_id}': {e}")
+            logger.error(f"Error loading HuggingFace model: {e}")
+            raise RuntimeError(f"Failed to load HuggingFace model '{model_id}': {e}") 
         
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.max_gpu_memory = max_gpu_memory
 
     def generate(self, context, question):
-        logger.info("Generating answer with LLM")
+        logger.info("Generating answer with HuggingFace LLM")
         gen_id = None  # Initialize gen_id
         
         try:
@@ -127,4 +142,21 @@ class LLMGenerator:
             if gen_id is not None:
                 self.metrics.log_error(gen_id, str(e))
             
-            return f"Error generating answer: {e}", 0
+            return f"Error generating answer: {e}", 
+
+    def get_model_info(self):  # ✅ ADICIONAR: método obrigatório de BaseGenerator
+        """Return HuggingFace model information."""
+        return {
+            'type': 'huggingface',
+            'model_id': self.model_id,
+            'max_tokens': self.max_tokens,
+            'temperature': self.temperature,
+            'max_gpu_memory': self.max_gpu_memory,
+            'device': str(self.model.device) if hasattr(self, 'model') else 'unknown'
+        }
+    
+    def count_tokens(self, text):  # ✅ ADICIONAR: override com tokenizer real
+        """Count tokens using HuggingFace tokenizer."""
+        if hasattr(self, 'tokenizer'):
+            return len(self.tokenizer.encode(text))
+        return super().count_tokens(text)  # Fallback to base implementation

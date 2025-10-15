@@ -1,5 +1,5 @@
 import unittest
-from generator.generator import GeneratorStub, LLMGenerator
+from generator.generator import GeneratorStub, HuggingFaceGenerator
 
 
 class TestGenerator(unittest.TestCase):
@@ -14,12 +14,12 @@ class TestGenerator(unittest.TestCase):
     def test_llm_generator_init(self):
         # Test model loading error handling (use an invalid model name)
         with self.assertRaises(RuntimeError):
-            LLMGenerator("invalid-model-name")
+            HuggingFaceGenerator("invalid-model-name")
 
     def test_llm_generator_generate(self):
         # This test will only run if the model is available and downloaded
         try:
-            generator = LLMGenerator("microsoft/bitnet-b1.58-2B-4T", max_tokens=10)
+            generator = HuggingFaceGenerator("microsoft/bitnet-b1.58-2B-4T", max_tokens=10)
             context = ["Sample context"]
             question = "What is RAG?"
             answer = generator.generate(context, question)
