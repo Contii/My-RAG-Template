@@ -4,64 +4,83 @@ import yaml
 import json
 from datetime import datetime
 from collections import defaultdict
-from utils.metrics.system_metrics import SystemMetrics
-
-_system_metrics = SystemMetrics()
 
 
-def log_model_loading_metrics(logger, duration):
+def log_model_loading_metrics(logger, duration, system_metrics=None):
     """Enhanced model loading metrics."""
-    system_state = _system_metrics.capture()
     
-    logger.info(
-        f"MODEL_LOADING - Duration: {duration:.2f}s, "
-        f"{_system_metrics.format_current_state()}"
-    )
+    # Basic logging (always happens)
+    logger.info(f"MODEL_LOADING - Duration: {duration:.2f}s")
     
-    # Save structured data
-    _save_structured_metrics("model_loading", {
-        'duration': duration,
-        'timestamp': datetime.now().isoformat(),
-        **system_state
-    })
+    # Optional metrics capture
+    if system_metrics:
+        try:
+            system_state = system_metrics.capture()
+            logger.info(f"System State: {system_metrics.format_current_state()}")
+            
+            # Save structured data
+            _save_structured_metrics("model_loading", {
+                'duration': duration,
+                'timestamp': datetime.now().isoformat(),
+                **system_state
+            })
+        except Exception as e:
+            logger.debug(f"Failed to capture system metrics: {e}")
 
-def log_generation_metrics(logger, duration):
+def log_generation_metrics(logger, duration, system_metrics=None):
     """Enhanced text generation metrics."""
-    system_state = _system_metrics.capture()
-    
-    logger.info(
-        f"TEXT_GENERATION - Duration: {duration:.2f}s, "
-        f"{_system_metrics.format_current_state()}"
-    )
-    
-    _save_structured_metrics("text_generation", {
-        'duration': duration,
-        'timestamp': datetime.now().isoformat(),
-        **system_state
-    })
 
-def log_retrieval_metrics(logger, duration, component_times, results_count, cache_hit=None):
-    """Enhanced retrieval metrics."""
-    system_state = _system_metrics.capture()
+    logger.info(f"TEXT_GENERATION - Duration: {duration:.2f}s")
     
+    if system_metrics:
+        try:
+            system_state = system_metrics.capture()
+            logger.info(f"System State: {system_metrics.format_current_state()}")
+            
+            _save_structured_metrics("text_generation", {
+                'duration': duration,
+                'timestamp': datetime.now().isoformat(),
+                **system_state
+            })
+        except Exception as e:
+            logger.debug(f"Failed to capture system metrics: {e}")
+
+def log_retrieval_metrics(logger, duration, component_times, results_count, cache_hit=None, system_metrics=None):
+    """
+    Enhanced retrieval metrics.
+    
+    Args:
+        logger: Logger instance
+        duration: Retrieval duration in seconds
+        component_times: Dict of component timings
+        results_count: Number of results retrieved
+        cache_hit: Whether cache was hit (optional)
+        system_metrics: Optional SystemMetrics instance for tracking (default: None)
+    """
     components_str = ", ".join([f"{k}: {v:.3f}s" for k, v in component_times.items()])
     cache_str = f", Cache: {'HIT' if cache_hit else 'MISS'}" if cache_hit is not None else ""
     
     logger.info(
         f"RETRIEVAL - Duration: {duration:.3f}s, "
         f"Results: {results_count}, "
-        f"Components: [{components_str}]{cache_str}, "
-        f"{_system_metrics.format_current_state()}"
+        f"Components: [{components_str}]{cache_str}"
     )
     
-    _save_structured_metrics("retrieval", {
-        'duration': duration,
-        'results_count': results_count,
-        'cache_hit': cache_hit,
-        'component_times': component_times,
-        'timestamp': datetime.now().isoformat(),
-        **system_state
-    })
+    if system_metrics:
+        try:
+            system_state = system_metrics.capture()
+            logger.info(f"System State: {system_metrics.format_current_state()}")
+            
+            _save_structured_metrics("retrieval", {
+                'duration': duration,
+                'results_count': results_count,
+                'cache_hit': cache_hit,
+                'component_times': component_times,
+                'timestamp': datetime.now().isoformat(),
+                **system_state
+            })
+        except Exception as e:
+            logger.debug(f"Failed to capture system metrics: {e}")
 
 def _save_structured_metrics(operation_type, metrics_data):
     """Save structured metrics to JSON for analysis."""
@@ -109,7 +128,7 @@ def close_metrics_session():
                     json.dump(data, f, indent=2, default=str)
                     
     except Exception as e:
-        logging.getLogger("logger").warning(f"Failed to close metrics session: {e}")      
+        logging.getLogger("logger").warning(f"Failed to close metrics session: {e}")
 
 def setup_logger(config_path="config/config.yaml"):
     """

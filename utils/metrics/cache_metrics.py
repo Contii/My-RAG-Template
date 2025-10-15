@@ -1,10 +1,8 @@
 import json
 import os
+import logging
 from datetime import datetime
 from collections import defaultdict
-from logger.logger import get_logger
-
-logger = get_logger("cache_metrics")
 
 """Cache-specific metrics: hit/miss rates, performance tracking."""
 
@@ -12,6 +10,8 @@ class CacheMetrics:
     """Track and analyze cache performance metrics."""
     
     def __init__(self, metrics_file="logs/cache_metrics.json"):
+        self.logger = logging.getLogger("cache_metrics")
+
         self.metrics_file = metrics_file
         self.hits = 0
         self.misses = 0
@@ -21,7 +21,7 @@ class CacheMetrics:
         self.session_start = datetime.now()
         
         os.makedirs(os.path.dirname(metrics_file), exist_ok=True)
-        logger.info("CacheMetrics initialized")
+        self.logger.info("CacheMetrics initialized")
     
     def log_hit(self, query, time_saved=None):
         """Log a cache hit."""
@@ -31,7 +31,7 @@ class CacheMetrics:
         if time_saved is not None:
             self.hit_times.append(time_saved)
         
-        logger.debug(f"Cache HIT - Query: {query[:50]}...")
+        self.logger.debug(f"Cache HIT - Query: {query[:50]}...")
         self._save_to_file()
     
     def log_miss(self, query, retrieval_time=None):
@@ -42,7 +42,7 @@ class CacheMetrics:
         if retrieval_time is not None:
             self.miss_times.append(retrieval_time)
         
-        logger.debug(f"Cache MISS - Query: {query[:50]}...")
+        self.logger.debug(f"Cache MISS - Query: {query[:50]}...")
         self._save_to_file()
     
     def get_hit_rate(self):
@@ -71,7 +71,7 @@ class CacheMetrics:
         if self.miss_times:
             summary['avg_miss_time'] = sum(self.miss_times) / len(self.miss_times)
         
-        logger.debug(f"Cache summary: {hit_rate:.1f}% hit rate ({self.hits}/{self.total_requests})")
+        self.logger.debug(f"Cache summary: {hit_rate:.1f}% hit rate ({self.hits}/{self.total_requests})")
         
         return summary
     
@@ -79,7 +79,7 @@ class CacheMetrics:
         """Print a formatted cache metrics dashboard."""
         summary = self.get_summary()
         
-        logger.info("Displaying cache metrics dashboard")
+        self.logger.info("Displaying cache metrics dashboard")
         
         print("\n" + "="*50)
         print("           CACHE METRICS DASHBOARD")
@@ -107,26 +107,26 @@ class CacheMetrics:
         if hit_rate > 70:
             insight = f"✅ Excellent cache hit rate ({hit_rate:.1f}%). Cache is highly effective."
             insights.append(insight)
-            logger.info(insight)
+            self.logger.info(insight)
         elif hit_rate > 40:
             insight = f"⚠️  Moderate cache hit rate ({hit_rate:.1f}%). Consider increasing TTL or cache size."
             insights.append(insight)
-            logger.warning(insight)
+            self.logger.warning(insight)
         elif hit_rate > 0:
             insight = f"❌ Low cache hit rate ({hit_rate:.1f}%). Review caching strategy or query patterns."
             insights.append(insight)
-            logger.warning(insight)
+            self.logger.warning(insight)
         else:
             insight = "❌ No cache hits. Cache may not be enabled or queries are too diverse."
             insights.append(insight)
-            logger.warning(insight)
+            self.logger.warning(insight)
         
         # Time savings insight
         if 'total_time_saved' in summary and summary['total_time_saved'] > 0:
             saved = summary['total_time_saved']
             insight = f"⚡ Cache saved {saved:.2f}s total ({saved/summary['total_requests']:.3f}s per request avg)."
             insights.append(insight)
-            logger.info(insight)
+            self.logger.info(insight)
         
         return insights
     
@@ -138,10 +138,10 @@ class CacheMetrics:
             with open(self.metrics_file, 'w') as f:
                 json.dump(data, f, indent=2, default=str)
             
-            logger.debug(f"Cache metrics saved to {self.metrics_file}")
+            self.logger.debug(f"Cache metrics saved to {self.metrics_file}")
                 
         except Exception as e:
-            logger.error(f"Failed to save cache metrics: {e}")
+            self.logger.error(f"Failed to save cache metrics: {e}")
     
     def reset(self):
         """Reset all cache metrics."""
@@ -152,4 +152,4 @@ class CacheMetrics:
         self.miss_times.clear()
         self.session_start = datetime.now()
         
-        logger.info("Cache metrics reset")
+        self.logger.info("Cache metrics reset")

@@ -1,13 +1,11 @@
 import json
 import os
+import logging
 from datetime import datetime
-from logger.logger import get_logger
 from .system_metrics import SystemMetrics
 from .retrieval_metrics import RetrievalMetrics
 from .cache_metrics import CacheMetrics
 from .generator_metrics import GeneratorMetrics
-
-logger = get_logger("unified_metrics")
 
 """Unified metrics coordinator - consolidates all metric systems."""
 
@@ -15,13 +13,15 @@ class MetricsCollector:
     """Central coordinator for all RAG system metrics."""
     
     def __init__(self):
+        self.logger = logging.getLogger("unified_metrics")
+
         self.system_monitor = SystemMetrics()
         self.retrieval_tracker = RetrievalMetrics()
         self.cache_tracker = CacheMetrics()
         self.generator_tracker = GeneratorMetrics()
         self.session_start = datetime.now()
         
-        logger.info("MetricsCollector initialized - all metrics systems ready")
+        self.logger.info("MetricsCollector initialized - all metrics systems ready")
     
     def get_unified_dashboard(self):
         """Get consolidated dashboard with all metrics."""
@@ -41,7 +41,7 @@ class MetricsCollector:
     
     def print_unified_dashboard(self):
         """Print comprehensive dashboard with all metrics."""
-        logger.info("Displaying unified metrics dashboard")
+        self.logger.info("Displaying unified metrics dashboard")
         
         print("\n" + "="*60)
         print("              UNIFIED RAG METRICS DASHBOARD")
@@ -110,7 +110,7 @@ class MetricsCollector:
     
     def print_all_insights(self):
         """Print all performance insights."""
-        logger.info("Displaying performance insights")
+        self.logger.info("Displaying performance insights")
         
         insights = self.get_all_insights()
         
@@ -150,10 +150,10 @@ class MetricsCollector:
             with open(filepath, 'w') as f:
                 json.dump(report, f, indent=2, default=str)
             
-            logger.info(f"Unified report saved to {filepath}")
+            self.logger.info(f"Unified report saved to {filepath}")
             
         except Exception as e:
-            logger.error(f"Failed to save unified report: {e}")
+            self.logger.error(f"Failed to save unified report: {e}")
     
     def clear_all_metrics(self):
         """Clear all metrics history."""
@@ -163,4 +163,4 @@ class MetricsCollector:
         # Note: retrieval_metrics doesn't have clear method yet
         
         self.session_start = datetime.now()
-        logger.info("All metrics cleared")
+        self.logger.info("All metrics cleared")

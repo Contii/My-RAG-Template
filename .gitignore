@@ -7,6 +7,9 @@ data/ragbench
 context.md
 cache/queries/*
 
+data/embeddings/*
+
+
 logs/
 *.log
 
