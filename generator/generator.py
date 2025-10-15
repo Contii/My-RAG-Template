@@ -1,6 +1,6 @@
 import torch
 import time
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from logger.logger import get_logger, log_model_loading_metrics, log_generation_metrics
 from utils.metrics.generator_metrics import GeneratorMetrics
 from generator.base_generator import BaseGenerator
@@ -47,18 +47,143 @@ class GeneratorStub(BaseGenerator):
 class HuggingFaceGenerator(BaseGenerator):
     """
     Generator that uses a Hugging Face LLM to generate answers.
+    Supports full configuration including quantization, device mapping, and generation parameters.
     """
-    def __init__(self, model_id, max_tokens=250, temperature=0.7, max_gpu_memory="3.8GB"):
-        logger.info(f"Loading HuggingFace model: {model_id}") 
-        self.metrics = GeneratorMetrics()
-        self.model_id = model_id
+    def __init__(self, config: dict = None, **kwargs):
+        """
+        Initialize HuggingFace generator from config dict or legacy kwargs.
         
+        Args:
+            config: Full configuration dict (preferred)
+            **kwargs: Legacy parameters (model_id, max_tokens, etc.) for backward compatibility
+        """
+        self.metrics = GeneratorMetrics()
+
+        # Handle both config dict and legacy kwargs
+        if config is None:
+            config = {
+                'model_id': kwargs.get('model_id'),
+                'max_tokens': kwargs.get('max_tokens', 250),
+                'temperature': kwargs.get('temperature', 0.7),
+                'max_gpu_memory': kwargs.get('max_gpu_memory', '3.8GB'),
+                'torch_dtype': 'bfloat16',  # Default
+                'device_map': 'auto',
+                'quantization': None
+            }
+        
+        self.config = config
+        self.model_id = config['model_id']
+
+        logger.info(f"Loading HuggingFace model: {self.model_id}")
+        
+        loading_kwargs = self._build_loading_kwargs()
+        self.generation_config = self._build_generation_config()
+        self._load_model(loading_kwargs)
+
+    def _build_loading_kwargs(self):
+        """Build kwargs for AutoModelForCausalLM.from_pretrained()"""
+        kwargs = {}
+        
+        # Dtype
+        dtype_map = {
+            'bfloat16': torch.bfloat16,
+            'float16': torch.float16,
+            'float32': torch.float32
+        }
+        dtype_str = self.config.get('torch_dtype', 'bfloat16')
+        kwargs['torch_dtype'] = dtype_map.get(dtype_str, torch.bfloat16)
+        
+        # Device mapping
+        if 'device_map' in self.config:
+            kwargs['device_map'] = self.config['device_map']
+        else:
+            kwargs['device_map'] = 'auto'
+        
+        # Memory - support both formats
+        if 'max_gpu_memory' in self.config:
+            # Legacy single GPU format
+            kwargs['max_memory'] = {0: self.config['max_gpu_memory']}
+        elif 'max_memory' in self.config:
+            # New multi-device format
+            kwargs['max_memory'] = self.config['max_memory']
+        
+        # Quantization
+        quant = self.config.get('quantization')
+        if quant == '8bit':
+            kwargs['load_in_8bit'] = True
+            logger.info("Loading model in 8-bit quantization")
+        elif quant == '4bit':
+            kwargs['load_in_4bit'] = True
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=kwargs['torch_dtype'],
+                bnb_4bit_use_double_quant=self.config.get('bnb_4bit_use_double_quant', True),
+                bnb_4bit_quant_type=self.config.get('bnb_4bit_quant_type', 'nf4')
+            )
+            kwargs['quantization_config'] = bnb_config
+            logger.info("Loading model in 4-bit quantization (NF4)")
+        
+        # Trust remote code (for models like Phi)
+        if self.config.get('trust_remote_code', False):
+            kwargs['trust_remote_code'] = True
+            logger.info("Enabled trust_remote_code")
+        
+        # Low CPU memory usage
+        if 'low_cpu_mem_usage' in self.config:
+            kwargs['low_cpu_mem_usage'] = self.config['low_cpu_mem_usage']
+        
+        # Flash Attention 2 (if available)
+        if self.config.get('use_flash_attention_2', False):
+            kwargs['use_flash_attention_2'] = True
+            logger.info("Enabled Flash Attention 2")
+        
+        return kwargs
+
+    def _build_generation_config(self):
+        """Build generation configuration"""
+        gen_config = {
+            'max_new_tokens': self.config.get('max_tokens', 250),
+            'temperature': self.config.get('temperature', 0.7),
+            'do_sample': self.config.get('do_sample', True),
+        }
+        
+        # Optional generation parameters
+        if 'top_p' in self.config:
+            gen_config['top_p'] = self.config['top_p']
+        
+        if 'top_k' in self.config:
+            gen_config['top_k'] = self.config['top_k']
+        
+        if 'repetition_penalty' in self.config:
+            gen_config['repetition_penalty'] = self.config['repetition_penalty']
+        
+        if 'num_beams' in self.config:
+            gen_config['num_beams'] = self.config['num_beams']
+        
+        if 'early_stopping' in self.config:
+            gen_config['early_stopping'] = self.config['early_stopping']
+        
+        if 'no_repeat_ngram_size' in self.config:
+            gen_config['no_repeat_ngram_size'] = self.config['no_repeat_ngram_size']
+        
+        if 'length_penalty' in self.config:
+            gen_config['length_penalty'] = self.config['length_penalty']
+        
+        return gen_config
+
+    def _load_model(self, loading_kwargs):
+        """Load model and tokenizer"""
         try:
             start_load = time.time()
             
-            self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_id,
+                trust_remote_code=loading_kwargs.get('trust_remote_code', False)
+            )
+            
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, torch_dtype=torch.bfloat16, device_map="auto", max_memory={0: max_gpu_memory}
+                self.model_id,
+                **loading_kwargs
             )
             
             load_duration = time.time() - start_load
@@ -71,18 +196,21 @@ class HuggingFaceGenerator(BaseGenerator):
                 logger.info(f"GPU: {gpu_name} {gpu_memory:.2f}GB")
             else:
                 logger.info("GPU: Not available, using CPU")
+            
+            # Log configuration summary
+            logger.info(f"Model loaded successfully:")
+            logger.info(f"  - dtype: {loading_kwargs.get('torch_dtype')}")
+            logger.info(f"  - device_map: {loading_kwargs.get('device_map')}")
+            logger.info(f"  - quantization: {self.config.get('quantization', 'none')}")
                 
         except Exception as e:
             logger.error(f"Error loading HuggingFace model: {e}")
-            raise RuntimeError(f"Failed to load HuggingFace model '{model_id}': {e}") 
+            raise RuntimeError(f"Failed to load HuggingFace model '{self.model_id}': {e}")
         
-        self.max_tokens = max_tokens
-        self.temperature = temperature
-        self.max_gpu_memory = max_gpu_memory
 
     def generate(self, context, question):
         logger.info("Generating answer with HuggingFace LLM")
-        gen_id = None  # Initialize gen_id
+        gen_id = None
         
         try:
             # Start tracking
@@ -108,15 +236,13 @@ class HuggingFaceGenerator(BaseGenerator):
             start_time = time.time()
             output = self.model.generate(
                 **inputs,
-                max_new_tokens=self.max_tokens,
-                temperature=self.temperature,
-                do_sample=True,
+                **self.generation_config,  # Use configured generation params
                 pad_token_id=self.tokenizer.eos_token_id
             )
             
             # Calculate metrics
             generation_time = time.time() - start_time
-            output_tokens = output.shape[1] - input_tokens  # Only new tokens
+            output_tokens = output.shape[1] - input_tokens
             tokens_per_second = output_tokens / generation_time if generation_time > 0 else 0
             
             answer = self.tokenizer.decode(output[0], skip_special_tokens=True)
@@ -125,7 +251,7 @@ class HuggingFaceGenerator(BaseGenerator):
             if answer.startswith(prompt):
                 answer = answer[len(prompt):].strip()
             
-            # Log generation metrics (existing)
+            # Log generation metrics
             log_generation_metrics(logger, generation_time)
             logger.info(f"Generated tokens: {output_tokens}, Generation time: {generation_time:.2f}s, Speed: {tokens_per_second:.2f} tokens/s")
             print(f"Generated tokens: {output_tokens}\nGeneration time: {generation_time:.2f}s\nSpeed: {tokens_per_second:.2f} tokens/s")
@@ -142,21 +268,36 @@ class HuggingFaceGenerator(BaseGenerator):
             if gen_id is not None:
                 self.metrics.log_error(gen_id, str(e))
             
-            return f"Error generating answer: {e}", 
+            return f"Error generating answer: {e}", 0
 
-    def get_model_info(self):  # ✅ ADICIONAR: método obrigatório de BaseGenerator
-        """Return HuggingFace model information."""
-        return {
+    def get_model_info(self):
+        """Return HuggingFace model information with full config."""
+        info = {
             'type': 'huggingface',
             'model_id': self.model_id,
-            'max_tokens': self.max_tokens,
-            'temperature': self.temperature,
-            'max_gpu_memory': self.max_gpu_memory,
             'device': str(self.model.device) if hasattr(self, 'model') else 'unknown'
         }
+        
+        # Add all config parameters
+        info.update({
+            'torch_dtype': self.config.get('torch_dtype', 'bfloat16'),
+            'device_map': self.config.get('device_map', 'auto'),
+            'quantization': self.config.get('quantization', None),
+            'max_tokens': self.config.get('max_tokens', 250),
+            'temperature': self.config.get('temperature', 0.7),
+            'do_sample': self.config.get('do_sample', True)
+        })
+        
+        # Add optional generation params if present
+        for key in ['top_p', 'top_k', 'repetition_penalty', 'num_beams', 
+                    'no_repeat_ngram_size', 'length_penalty']:
+            if key in self.config:
+                info[key] = self.config[key]
+        
+        return info
     
-    def count_tokens(self, text):  # ✅ ADICIONAR: override com tokenizer real
+    def count_tokens(self, text):
         """Count tokens using HuggingFace tokenizer."""
         if hasattr(self, 'tokenizer'):
             return len(self.tokenizer.encode(text))
-        return super().count_tokens(text)  # Fallback to base implementation
+        return super().count_tokens(text)

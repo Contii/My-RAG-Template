@@ -1,3 +1,4 @@
+import yaml
 from generator.base_generator import BaseGenerator
 from generator.generator import GeneratorStub, HuggingFaceGenerator
 from logger.logger import get_logger
@@ -65,17 +66,8 @@ class GeneratorFactory:
             if not model_id:
                 raise ValueError("HuggingFace generator requires 'model_id' in config")
             
-            max_tokens = config.get('max_tokens', 250)
-            temperature = config.get('temperature', 0.7)
-            max_gpu_memory = config.get('max_gpu_memory', '3.8GB')
-            
             logger.info(f"Creating HuggingFaceGenerator: {model_id}")
-            return HuggingFaceGenerator(
-                model_id=model_id,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                max_gpu_memory=max_gpu_memory
-            )
+            return HuggingFaceGenerator(config=config)
         
         # Future generators (commented examples)
         # elif generator_type == 'ollama':
@@ -110,7 +102,106 @@ class GeneratorFactory:
             List of supported generator type strings
         """
         return ['stub', 'huggingface']  # Future: 'ollama', 'gguf', 'vllm'
+
+    @staticmethod
+    def list_available_models(config_path="config/config.yaml") -> list:
+        """
+        List all configured models from config file.
+        
+        Args:
+            config_path: Path to configuration YAML
+            
+        Returns:
+            List of model names
+        """
+        try:
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+            
+            gen_config = config.get('generator', {})
+            models = gen_config.get('models', {})
+            
+            if not models:
+                # Single model config (legacy)
+                if 'model_id' in gen_config:
+                    return ['default']
+                return []
+            
+            return list(models.keys())
+        
+        except Exception as e:
+            logger.error(f"Error listing models from {config_path}: {e}")
+            return []
+
+    @staticmethod
+    def get_model_config(model_name: str, config_path="config/config.yaml") -> dict:
+        """
+        Get configuration for a specific model.
+        
+        Args:
+            model_name: Name of the model profile
+            config_path: Path to configuration YAML
+            
+        Returns:
+            Model configuration dictionary
+            
+        Raises:
+            ValueError: If model not found
+        """
+        try:
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+            
+            gen_config = config.get('generator', {})
+            models = gen_config.get('models', {})
+            
+            if not models:
+                # Single model config (legacy)
+                if model_name == 'default' and 'model_id' in gen_config:
+                    return gen_config
+                raise ValueError(f"No models configured in {config_path}")
+            
+            if model_name not in models:
+                available = list(models.keys())
+                raise ValueError(
+                    f"Model '{model_name}' not found. "
+                    f"Available models: {', '.join(available)}"
+                )
+            
+            return models[model_name]
+        
+        except Exception as e:
+            logger.error(f"Error getting model config for '{model_name}': {e}")
+            raise
     
+    @staticmethod
+    def get_active_model_name(config_path="config/config.yaml") -> str:
+        """
+        Get the name of the currently active model.
+        
+        Args:
+            config_path: Path to configuration YAML
+            
+        Returns:
+            Active model name
+        """
+        try:
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+            
+            gen_config = config.get('generator', {})
+            
+            # Check for multi-model config
+            if 'models' in gen_config:
+                return gen_config.get('active_model', list(gen_config['models'].keys())[0])
+            
+            # Single model (legacy)
+            return 'default'
+        
+        except Exception as e:
+            logger.error(f"Error getting active model from {config_path}: {e}")
+            return 'default'
+
     @staticmethod
     def create_from_legacy_config(
         generator_type: str,
@@ -141,12 +232,14 @@ class GeneratorFactory:
             if not llm_model:
                 raise ValueError("LLM generator requires llm_model parameter")
             
-            return HuggingFaceGenerator(
-                model_id=llm_model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                max_gpu_memory=max_gpu_memory
-            )
+            config = {
+                'type': 'huggingface',
+                'model_id': llm_model,
+                'max_tokens': max_tokens,
+                'temperature': temperature,
+                'max_gpu_memory': max_gpu_memory
+            }
+            return HuggingFaceGenerator(config=config)
         
         else:
             raise ValueError(

@@ -1,5 +1,6 @@
 import yaml
 import time
+import torch
 from retriever.semantic_retriever import RetrieverStub
 from generator.generator import GeneratorStub
 from generator.generator_factory import GeneratorFactory
@@ -27,6 +28,7 @@ class RAGPipeline:
         self.use_rag = use_rag
         self.retriever_type = self.config.get("retriever_type", "stub")
         self.data_path = self.config.get("data_path", "data/")
+        self.config_path = config_path
 
         # Initialize retriever based on configuration
         if self.retriever_type == "smart":
@@ -114,35 +116,131 @@ class RAGPipeline:
         if generator:
             # Use provided generator instance
             self.generator = generator
+            self.current_model = 'provided'
+            self.available_models = []
+            self._model_configs = {}
             logger.info(f"Using provided generator: {self.generator.get_model_info()['type']}")
         else:
             # Create generator from config using factory
             generator_config = self.config.get('generator', {})
             
-            # Fallback to legacy config format if new format not found
-            if not generator_config or 'type' not in generator_config:
-                logger.warning("New generator config not found, attempting legacy format")
-                legacy_generator_type = self.config.get("generator_type", "stub")
-                
-                if legacy_generator_type == "llm":
-                    generator_config = {
-                        'type': 'huggingface',
-                        'model_id': self.config.get("llm_model", "microsoft/bitnet-b1.58-2B-4T"),
-                        'max_tokens': self.config.get("max_tokens", 250),
-                        'temperature': self.config.get("temperature", 0.7),
-                        'max_gpu_memory': self.config.get("max_gpu_memory", "3.8GB")
-                    }
-                else:
-                    generator_config = {'type': 'stub'}
+            # Check for multi-model config
+            models = generator_config.get('models', {})
             
-            self.generator = GeneratorFactory.create_generator(generator_config)
-            logger.info(f"Generator created from config: {self.generator.get_model_info()['type']}")
+            if models:
+                # Multi-model configuration
+                self.available_models = list(models.keys())
+                self.current_model = generator_config.get('active_model', self.available_models[0])
+                self._model_configs = models
+                
+                # Load active model
+                model_config = models[self.current_model]
+                self.generator = GeneratorFactory.create_generator(model_config)
+                
+                logger.info(f"Multi-model setup: {len(self.available_models)} models available")
+                logger.info(f"Active model: {self.current_model}")
+                logger.info(f"Available models: {', '.join(self.available_models)}")
+            
+            else:
+                # Single model configuration (legacy or simple)
+                self.available_models = []
+                self.current_model = 'default'
+                self._model_configs = {}
+                
+                # Fallback to legacy config format if new format not found
+                if not generator_config or 'type' not in generator_config:
+                    logger.warning("New generator config not found, attempting legacy format")
+                    legacy_generator_type = self.config.get("generator_type", "stub")
+                    
+                    if legacy_generator_type == "llm":
+                        generator_config = {
+                            'type': 'huggingface',
+                            'model_id': self.config.get("llm_model", "microsoft/bitnet-b1.58-2B-4T"),
+                            'max_tokens': self.config.get("max_tokens", 250),
+                            'temperature': self.config.get("temperature", 0.7),
+                            'max_gpu_memory': self.config.get("max_gpu_memory", "3.8GB")
+                        }
+                    else:
+                        generator_config = {'type': 'stub'}
+                
+                self.generator = GeneratorFactory.create_generator(generator_config)
+                logger.info(f"Single model configuration loaded")
 
         # Store generator info for display
         self.generator_info = self.generator.get_model_info()
 
         logger.info(f"Pipeline configured - Retriever: {self.retriever_type}, Generator: {self.generator_type}")
 
+    def switch_model(self, model_name: str):
+        """
+        Switch to a different model without restarting the pipeline.
+        
+        Args:
+            model_name: Name of the model to switch to
+            
+        Raises:
+            ValueError: If model not available or multi-model not configured
+        """
+        if not self.available_models:
+            raise ValueError(
+                "Model switching not available. "
+                "Configure multiple models in config.yaml under generator.models"
+            )
+        
+        if model_name not in self.available_models:
+            raise ValueError(
+                f"Model '{model_name}' not available. "
+                f"Available models: {', '.join(self.available_models)}"
+            )
+        
+        if model_name == self.current_model:
+            logger.info(f"Model '{model_name}' is already active")
+            return
+        
+        logger.info(f"Switching model from '{self.current_model}' to '{model_name}'")
+        print(f"\n🔄 Switching model from '{self.current_model}' to '{model_name}'...")
+        
+        try:
+            # Unload current model
+            del self.generator
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            # Load new model
+            model_config = self._model_configs[model_name]
+            self.generator = GeneratorFactory.create_generator(model_config)
+            self.current_model = model_name
+            self.generator_info = self.generator.get_model_info()
+            
+            logger.info(f"Successfully switched to model: {model_name}")
+            print(f"✅ Model switched successfully to '{model_name}'")
+            print(f"   Model ID: {self.generator_info.get('model_id', 'N/A')}")
+            print(f"   Quantization: {self.generator_info.get('quantization', 'none')}")
+            
+        except Exception as e:
+            logger.error(f"Error switching model: {e}")
+            print(f"❌ Error switching model: {e}")
+            # Try to reload previous model
+            try:
+                model_config = self._model_configs[self.current_model]
+                self.generator = GeneratorFactory.create_generator(model_config)
+                logger.info(f"Reverted to previous model: {self.current_model}")
+            except:
+                raise RuntimeError(f"Failed to switch model and couldn't revert: {e}")
+
+    def list_models(self) -> dict:
+        """
+        List available models and current active model.
+        
+        Returns:
+            Dictionary with 'current' and 'available' keys
+        """
+        return {
+            'current': self.current_model,
+            'available': self.available_models,
+            'multi_model_enabled': len(self.available_models) > 0
+        }
+          
     def run(self, question, filters=None):
         """Run pipeline with optional filters."""
         logger.info("Running RAG pipeline")
@@ -168,9 +266,13 @@ class RAGPipeline:
                 context = self.retriever.retrieve(question)
         
         # Show generator info from stored metadata
-        print(f"Using {self.generator_info['type']} generator: {self.generator_info.get('model_id', self.generator_info.get('name', 'unknown'))}")
-        print(f"Max tokens: {self.generator_info.get('max_tokens', 'N/A')}")
-        print(f"Temperature: {self.generator_info.get('temperature', 'N/A')}")
+        print(f"\n🤖 Using {self.generator_info['type']} generator: {self.generator_info.get('model_id', self.generator_info.get('name', 'unknown'))}")
+        if self.available_models:
+            print(f"   Active model profile: {self.current_model}")
+        print(f"   Max tokens: {self.generator_info.get('max_tokens', 'N/A')}")
+        print(f"   Temperature: {self.generator_info.get('temperature', 'N/A')}")
+        if 'quantization' in self.generator_info and self.generator_info['quantization']:
+            print(f"   Quantization: {self.generator_info['quantization']}")
         
         # Generate answer
         answer, generation_time = self.generator.generate(context, question)
@@ -228,4 +330,12 @@ class RAGPipeline:
     
     def get_generator_info(self):
         """Get information about current generator configuration."""
-        return self.generator_info
+        info = self.generator_info.copy()
+        if self.available_models:
+            info['current_model'] = self.current_model
+            info['available_models'] = self.available_models
+            info['multi_model_enabled'] = True
+        else:
+            info['multi_model_enabled'] = False
+        
+        return info
