@@ -1,10 +1,23 @@
-llm_model: "microsoft/bitnet-b1.58-2B-4T"
 retriever_type: "smart"
-generator_type: "llm"
-max_tokens: 250
 data_path: "data/documents/"
-temperature: 0.7
-max_gpu_memory: "3.8GB" # aprox 95% of 4GB GPU
+
+# Generator Configuration
+generator:
+  type: "huggingface"  # Options: stub, huggingface (future: ollama, gguf, vllm)
+
+  # HuggingFace settings
+  model_id: "microsoft/bitnet-b1.58-2B-4T"
+  max_tokens: 250
+  temperature: 0.7
+  max_gpu_memory: "3.8GB"  # Approx 95% of 4GB GPU
+
+  # Future - Ollama example:
+  # type: "ollama"
+  # model: "llama3"
+  # base_url: "http://localhost:11434"
+  # temperature: 0.7
+  # max_tokens: 250
+
 
 # Smart Retriever configuration
 retrieval:
@@ -27,6 +40,7 @@ retrieval:
   faiss:
     dimension: 384 # Ensure this matches your embedding model output dimension
     metric: "inner_product"  # Options: "inner_product", "l2"
+
 
 # Logging configuration
 logging:
