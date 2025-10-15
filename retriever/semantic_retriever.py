@@ -45,6 +45,8 @@ class SemanticRetriever:
         faiss_config = self.config.get('retrieval', {}).get('faiss', None)
         self.faiss_index = FAISSIndex(dimension=self.embedding_dim, config=faiss_config)
 
+        logger.info(f"FAISS configuration: {self.faiss_index.get_stats()}")
+
         # Initialize document storage
         self.documents = []
         self.embeddings = None
@@ -163,6 +165,9 @@ class SemanticRetriever:
                 # Load FAISS index using FAISSIndex class
                 self.faiss_index.load(faiss_file)
                 
+                stats = self.faiss_index.get_stats()
+                logger.info(f"FAISS index loaded: {stats}")
+
                 logger.info(f"Loaded {len(self.documents)} documents with embeddings")
                 print(f"Loaded {len(self.documents)} documents with embeddings successfully.")
                 return
@@ -210,6 +215,9 @@ class SemanticRetriever:
         logger.info(f"Retrieving documents for query: {query[:50]}...")
         print(f"\nRetrieving documents for query: {query[:50]}...")
         
+        stats = self.faiss_index.get_stats()
+        logger.debug(f"FAISS stats - vectors: {stats['num_vectors']}, index_type: {stats['index_type']}")
+        
         if not self.documents or self.faiss_index.is_empty():
             logger.warning("No documents or index available")
             return ["No documents available"]
@@ -222,6 +230,8 @@ class SemanticRetriever:
             # Search using FAISSIndex
             indices, scores = self.faiss_index.search(query_embedding, self.top_k)
             
+            logger.debug(f"Search completed - top_k: {self.top_k}, results: {len(indices)}")
+
             # Prepare results
             results = []
             for i, (idx, score) in enumerate(zip(indices, scores)):
