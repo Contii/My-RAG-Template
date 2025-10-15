@@ -169,7 +169,7 @@ class RAGPipeline:
         # Store generator info for display
         self.generator_info = self.generator.get_model_info()
 
-        logger.info(f"Pipeline configured - Retriever: {self.retriever_type}, Generator: {self.generator_type}")
+        logger.info(f"Pipeline configured - Retriever: {self.retriever_type}, Generator: {self.generator_info['type']}")
 
     def switch_model(self, model_name: str):
         """
@@ -266,11 +266,11 @@ class RAGPipeline:
                 context = self.retriever.retrieve(question)
         
         # Show generator info from stored metadata
-        print(f"\n🤖 Using {self.generator_info['type']} generator: {self.generator_info.get('model_id', self.generator_info.get('name', 'unknown'))}")
         if self.available_models:
-            print(f"   Active model profile: {self.current_model}")
-        print(f"   Max tokens: {self.generator_info.get('max_tokens', 'N/A')}")
-        print(f"   Temperature: {self.generator_info.get('temperature', 'N/A')}")
+            print(f"\n   Active model profile: {self.current_model}")
+        print(f"🤖 Using {self.generator_info['type']} generator: {self.generator_info.get('model_id', self.generator_info.get('name', 'unknown'))}")
+        print(f"🎯 Max tokens: {self.generator_info.get('max_tokens', 'N/A')}")
+        print(f"🌡️  Temperature: {self.generator_info.get('temperature', 'N/A')}")
         if 'quantization' in self.generator_info and self.generator_info['quantization']:
             print(f"   Quantization: {self.generator_info['quantization']}")
         
@@ -278,19 +278,7 @@ class RAGPipeline:
         answer, generation_time = self.generator.generate(context, question)
         logger.info(f"Answer generated: {answer}")
         log_generation_metrics(logger, generation_time)
-        
-        # Print metrics if SmartRetriever with metrics enabled
-        if hasattr(self.retriever, 'print_metrics_dashboard'):
-            self.retriever.print_metrics_dashboard()
-        
-        # Performance insights for SmartRetriever
-        if hasattr(self.retriever, 'get_performance_insights'):
-            insights = self.retriever.get_performance_insights()
-            if insights and any('Metrics tracking is disabled' not in insight for insight in insights):
-                print("\n💡 PERFORMANCE INSIGHTS:")
-                for insight in insights:
-                    print(f"   {insight}")
-        
+                
         # Print filter info if available (after insights)
         if hasattr(self.retriever, 'print_filter_info') and filters:
             self.retriever.print_filter_info()

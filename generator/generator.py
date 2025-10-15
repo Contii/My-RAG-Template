@@ -254,7 +254,7 @@ class HuggingFaceGenerator(BaseGenerator):
             # Log generation metrics
             log_generation_metrics(logger, generation_time)
             logger.info(f"Generated tokens: {output_tokens}, Generation time: {generation_time:.2f}s, Speed: {tokens_per_second:.2f} tokens/s")
-            print(f"Generated tokens: {output_tokens}\nGeneration time: {generation_time:.2f}s\nSpeed: {tokens_per_second:.2f} tokens/s")
+            print(f"✨ Generated tokens: {output_tokens}\n⏱️  Generation time: {generation_time:.2f}s\n⚡ Speed: {tokens_per_second:.2f} tokens/s")
             
             # Finish tracking with token metrics
             self.metrics.finish_generation(gen_id, len(answer), generation_time, output_tokens)
@@ -301,3 +301,9 @@ class HuggingFaceGenerator(BaseGenerator):
         if hasattr(self, 'tokenizer'):
             return len(self.tokenizer.encode(text))
         return super().count_tokens(text)
+
+    def get_performance_insights(self):
+        """Get performance insights from generator metrics."""
+        if self.metrics:
+            return self.metrics.get_performance_insights()
+        return []
