@@ -2,6 +2,7 @@ docs/*
 !docs/INSTALL.md
 !docs/USAGE_EXAMPLES.md
 !docs/ARCHITECTURE.md
+!docs/HUGGINGFACE_CONFIGS.md
 
 data/ragbench
 context.md
