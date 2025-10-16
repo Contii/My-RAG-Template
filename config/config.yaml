@@ -1,10 +1,74 @@
-llm_model: "microsoft/bitnet-b1.58-2B-4T"
 retriever_type: "smart"
-generator_type: "llm"
-max_tokens: 250
 data_path: "data/documents/"
-temperature: 0.7
-max_gpu_memory: "3.8GB" # aprox 95% of 4GB GPU
+
+# Generator Configuration
+generator:
+  active_model: "bitnet"  # Currently active model
+  
+  # Model catalog with individual configurations
+  models:
+    bitnet:
+      type: "huggingface"
+      model_id: "microsoft/bitnet-b1.58-2B-4T"
+      
+      # Loading configs
+      torch_dtype: "bfloat16"
+      device_map: "auto"
+      max_gpu_memory: "3.8GB"
+      quantization: null  # null, '4bit', '8bit'
+      low_cpu_mem_usage: true
+      trust_remote_code: false
+      
+      # Generation configs
+      max_tokens: 250
+      temperature: 0.7
+      do_sample: true
+      top_p: 0.9
+      repetition_penalty: 1.0
+    
+    # Example: Gemma model with 8-bit quantization
+    # gemma:
+    #   type: "huggingface"
+    #   model_id: "google/gemma-2-9b-it"
+    #   
+    #   # Loading configs
+    #   torch_dtype: "float16"
+    #   device_map: "balanced"
+    #   max_gpu_memory: "7GB"
+    #   quantization: "8bit"
+    #   
+    #   # Generation configs
+    #   max_tokens: 512
+    #   temperature: 0.8
+    #   do_sample: true
+    #   top_p: 0.95
+    #   repetition_penalty: 1.1
+    #   no_repeat_ngram_size: 3
+    
+    # Example: Llama with 4-bit quantization
+    # llama:
+    #   type: "huggingface"
+    #   model_id: "meta-llama/Llama-2-7b-chat-hf"
+    #   
+    #   # Loading configs
+    #   torch_dtype: "float16"
+    #   device_map: "auto"
+    #   max_gpu_memory: "3.8GB"
+    #   quantization: "4bit"
+    #   bnb_4bit_use_double_quant: true
+    #   bnb_4bit_quant_type: "nf4"
+    #   
+    #   # Generation configs
+    #   max_tokens: 1024
+    #   temperature: 0.6
+    #   do_sample: true
+    #   top_p: 0.9
+    #   repetition_penalty: 1.15
+    
+    # Example: Stub for testing
+    # stub:
+    #   type: "stub"
+
 
 # Smart Retriever configuration
 retrieval:
@@ -27,6 +91,7 @@ retrieval:
   faiss:
     dimension: 384 # Ensure this matches your embedding model output dimension
     metric: "inner_product"  # Options: "inner_product", "l2"
+
 
 # Logging configuration
 logging:

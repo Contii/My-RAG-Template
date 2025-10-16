@@ -343,18 +343,18 @@ class SmartRetriever:
     
     def get_performance_insights(self):
         """Get performance insights if metrics are enabled."""
-        if self.metrics:
-            return self.metrics.get_performance_insights()
+        if self.retrieval_metrics:
+            return self.retrieval_metrics.get_performance_insights()
         return ["Detailed metrics tracking is disabled"]
     
     def save_metrics_report(self, filepath="logs/retrieval_report.txt"):
         """Save detailed metrics report if metrics are enabled."""
-        if not self.metrics:
+        if not self.retrieval_metrics:
             logger.info("Detailed metrics tracking disabled, no report to save")
             return
         
         try:
-            summary = self.metrics.get_session_summary()
+            summary = self.retrieval_metrics.get_session_summary()
             insights = self.get_performance_insights()
             
             with open(filepath, 'w') as f:

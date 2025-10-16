@@ -91,7 +91,7 @@ def main():
  
     
     while True:
-        question = input("Question: ")
+        question = input("\n❓ Question: ")
         
         if question.strip().lower() == "exit":
             # Save final metrics report before exit
@@ -160,8 +160,26 @@ def main():
                 final_answer = clean_lines[0] if clean_lines else final_answer
         
         print(f"\n❓ Question: {question}")
-        print(f"\n🤖 Answer: {final_answer}")
-        print(f"\n⏱️ Generation time: {end_gen - start_gen:.2f} seconds")
+        print(f"\n💬 Answer: {final_answer}")
+
+        # Performance insights for SmartRetriever
+        print("\n💡 PERFORMANCE INSIGHTS:")
+        # Retrieval insights
+        if hasattr(pipeline.retriever, 'get_performance_insights'):
+            retrieval_insights = pipeline.retriever.get_performance_insights()
+            if retrieval_insights:
+                print("   📚 Retrieval:")
+                for insight in retrieval_insights:
+                    print(f"      {insight}")
+        
+        # Generator insights
+        if hasattr(pipeline.generator, 'get_performance_insights'):
+            generator_insights = pipeline.generator.get_performance_insights()
+            if generator_insights:
+                print("   🤖 Generation:")
+                for insight in generator_insights:
+                    print(f"      {insight}")
+
         print("="*40,"\n")
 
 if __name__ == "__main__":

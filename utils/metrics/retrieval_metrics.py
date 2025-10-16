@@ -1,11 +1,9 @@
 import time
 import json
 import os
+import logging
 from datetime import datetime
 from collections import defaultdict
-from logger.logger import get_logger
-
-logger = get_logger("retrieval_metrics")
 
 """Retrieval-specific metrics: query tracking, cache stats, component timing."""
 
@@ -13,13 +11,15 @@ class RetrievalMetrics:
     """Track and analyze retrieval performance metrics."""
     
     def __init__(self, metrics_file="logs/retrieval_metrics.json"):
+        self.logger = logging.getLogger("retrieval_metrics")
+
         self.metrics_file = metrics_file
         self.query_data = {}
         self.query_counter = 0
         self.session_start = datetime.now()
         
         os.makedirs(os.path.dirname(metrics_file), exist_ok=True)
-        logger.info("RetrievalMetrics initialized")
+        self.logger.info("RetrievalMetrics initialized")
     
     def start_query(self, query_text):
         """Start tracking a new query."""
@@ -35,21 +35,21 @@ class RetrievalMetrics:
             'num_results': 0
         }
         
-        logger.debug(f"Started tracking query {query_id}: {query_text[:50]}...")
+        self.logger.debug(f"Started tracking query {query_id}: {query_text[:50]}...")
         return query_id
     
     def log_component(self, query_id, component_name, duration):
         """Log timing for a specific component."""
         if query_id in self.query_data:
             self.query_data[query_id]['component_times'][component_name] = duration
-            logger.debug(f"Query {query_id} - {component_name}: {duration:.3f}s")
+            self.logger.debug(f"Query {query_id} - {component_name}: {duration:.3f}s")
     
     def log_cache_status(self, query_id, cache_hit):
         """Log whether query hit cache."""
         if query_id in self.query_data:
             self.query_data[query_id]['cache_hit'] = cache_hit
             status = "HIT" if cache_hit else "MISS"
-            logger.debug(f"Query {query_id} - Cache {status}")
+            self.logger.debug(f"Query {query_id} - Cache {status}")
     
     def finish_query(self, query_id, num_results):
         """Finish tracking a query."""
@@ -63,7 +63,7 @@ class RetrievalMetrics:
             end = datetime.fromisoformat(query['end_time'])
             query['total_time'] = (end - start).total_seconds()
             
-            logger.info(
+            self.logger.info(
                 f"Query {query_id} completed - "
                 f"Time: {query['total_time']:.3f}s, "
                 f"Results: {num_results}, "
@@ -75,7 +75,7 @@ class RetrievalMetrics:
     def get_session_summary(self):
         """Get summary statistics for the current session."""
         if not self.query_data:
-            logger.debug("No queries to summarize")
+            self.logger.debug("No queries to summarize")
             return {
                 'total_queries': 0,
                 'avg_response_time': 0,
@@ -114,7 +114,7 @@ class RetrievalMetrics:
             for comp, times in component_times.items()
         }
         
-        logger.debug(f"Session summary: {total_queries} queries, avg time {avg_time:.3f}s")
+        self.logger.debug(f"Session summary: {total_queries} queries, avg time {avg_time:.3f}s")
         
         return {
             'total_queries': total_queries,
@@ -128,7 +128,7 @@ class RetrievalMetrics:
         """Print a formatted metrics dashboard."""
         summary = self.get_session_summary()
         
-        logger.info("Displaying metrics dashboard")
+        self.logger.info("Displaying metrics dashboard")
         
         print("\n" + "="*50)
         print("           RETRIEVAL METRICS DASHBOARD")
@@ -155,11 +155,11 @@ class RetrievalMetrics:
         if avg_time > 2.0:
             insight = "⚠️  Average response time is high (>2s). Consider optimizing retrieval or enabling cache."
             insights.append(insight)
-            logger.warning(insight)
+            self.logger.warning(insight)
         elif avg_time < 0.5:
             insight = "✅ Excellent response time (<0.5s)."
             insights.append(insight)
-            logger.info(insight)
+            self.logger.info(insight)
         
         # Cache insights
         cache_rate_str = summary['cache_hit_rate']
@@ -168,15 +168,15 @@ class RetrievalMetrics:
             if cache_rate > 50:
                 insight = f"✅ Cache hit rate is good ({cache_rate_str}). Cache is working effectively."
                 insights.append(insight)
-                logger.info(insight)
+                self.logger.info(insight)
             elif cache_rate > 20:
                 insight = f"⚠️  Cache hit rate is moderate ({cache_rate_str}). Consider increasing TTL or reviewing query patterns."
                 insights.append(insight)
-                logger.warning(insight)
+                self.logger.warning(insight)
             else:
                 insight = f"❌ Low cache hit rate ({cache_rate_str}). Review caching strategy."
                 insights.append(insight)
-                logger.warning(insight)
+                self.logger.warning(insight)
         
         # Component insights
         component_times = summary['component_avg_times']
@@ -185,7 +185,7 @@ class RetrievalMetrics:
             if slowest[1] > 1.0:
                 insight = f"🔧 {slowest[0]} is the slowest component ({slowest[1]:.3f}s avg). Consider optimization."
                 insights.append(insight)
-                logger.warning(insight)
+                self.logger.warning(insight)
         
         return insights
     
@@ -201,10 +201,10 @@ class RetrievalMetrics:
             with open(self.metrics_file, 'w') as f:
                 json.dump(data, f, indent=2, default=str)
             
-            logger.debug(f"Metrics saved to {self.metrics_file}")
+            self.logger.debug(f"Metrics saved to {self.metrics_file}")
                 
         except Exception as e:
-            logger.error(f"Failed to save retrieval metrics: {e}")
+            self.logger.error(f"Failed to save retrieval metrics: {e}")
     
     def save_session_report(self, filepath="logs/retrieval_report.txt"):
         """Save a human-readable session report."""
@@ -238,7 +238,7 @@ class RetrievalMetrics:
                 
                 f.write("\n" + "="*60 + "\n")
             
-            logger.info(f"Session report saved to {filepath}")
+            self.logger.info(f"Session report saved to {filepath}")
             
         except Exception as e:
-            logger.error(f"Failed to save session report: {e}")
+            self.logger.error(f"Failed to save session report: {e}")

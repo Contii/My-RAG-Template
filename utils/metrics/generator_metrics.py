@@ -1,10 +1,8 @@
 import json
 import os
+import logging
 from datetime import datetime
 from collections import defaultdict
-from logger.logger import get_logger
-
-logger = get_logger("generator_metrics")
 
 """Generator-specific metrics: LLM performance, token usage, generation timing."""
 
@@ -12,13 +10,15 @@ class GeneratorMetrics:
     """Track and analyze LLM generation performance metrics."""
     
     def __init__(self, metrics_file="logs/generator_metrics.json"):
+        self.logger = logging.getLogger("generator_metrics")
+
         self.metrics_file = metrics_file
         self.generation_data = {}
         self.generation_counter = 0
         self.session_start = datetime.now()
         
         os.makedirs(os.path.dirname(metrics_file), exist_ok=True)
-        logger.info("GeneratorMetrics initialized")
+        self.logger.info("GeneratorMetrics initialized")
     
     def start_generation(self, context_length, question_length):
         """Start tracking a new generation."""
@@ -33,7 +33,7 @@ class GeneratorMetrics:
             'input_length': context_length + question_length
         }
         
-        logger.debug(f"Started tracking generation {gen_id}")
+        self.logger.debug(f"Started tracking generation {gen_id}")
         return gen_id
     
     def finish_generation(self, gen_id, output_length, duration, num_tokens=None):
@@ -46,7 +46,7 @@ class GeneratorMetrics:
             gen['tokens_per_second'] = num_tokens / duration if num_tokens and duration > 0 else None
             gen['num_tokens'] = num_tokens
             
-            logger.info(
+            self.logger.info(
                 f"Generation {gen_id} completed - "
                 f"Duration: {duration:.2f}s, "
                 f"Output: {output_length} chars"
@@ -61,13 +61,13 @@ class GeneratorMetrics:
             self.generation_data[gen_id]['error'] = error_message
             self.generation_data[gen_id]['end_time'] = datetime.now().isoformat()
             
-            logger.error(f"Generation {gen_id} failed: {error_message}")
+            self.logger.error(f"Generation {gen_id} failed: {error_message}")
             self._save_to_file()
     
     def get_summary(self):
         """Get summary statistics for generation performance."""
         if not self.generation_data:
-            logger.debug("No generations to summarize")
+            self.logger.debug("No generations to summarize")
             return {
                 'total_generations': 0,
                 'successful_generations': 0,
@@ -106,7 +106,7 @@ class GeneratorMetrics:
             if speeds:
                 summary['avg_tokens_per_second'] = sum(speeds) / len(speeds)
         
-        logger.debug(f"Generator summary: {success_count}/{total_count} successful")
+        self.logger.debug(f"Generator summary: {success_count}/{total_count} successful")
         
         return summary
     
@@ -114,7 +114,7 @@ class GeneratorMetrics:
         """Print a formatted generator metrics dashboard."""
         summary = self.get_summary()
         
-        logger.info("Displaying generator metrics dashboard")
+        self.logger.info("Displaying generator metrics dashboard")
         
         print("\n" + "="*50)
         print("         GENERATOR METRICS DASHBOARD")
@@ -143,19 +143,19 @@ class GeneratorMetrics:
         if success_rate == 100:
             insight = "✅ Perfect generation success rate (100%)."
             insights.append(insight)
-            logger.info(insight)
+            self.logger.info(insight)
         elif success_rate >= 90:
             insight = f"✅ High generation success rate ({success_rate:.1f}%)."
             insights.append(insight)
-            logger.info(insight)
+            self.logger.info(insight)
         elif success_rate >= 70:
             insight = f"⚠️  Moderate generation success rate ({success_rate:.1f}%). Check error logs."
             insights.append(insight)
-            logger.warning(insight)
+            self.logger.warning(insight)
         else:
             insight = f"❌ Low generation success rate ({success_rate:.1f}%). Review configuration."
             insights.append(insight)
-            logger.warning(insight)
+            self.logger.warning(insight)
         
         # Duration insights
         avg_duration = summary.get('avg_duration')
@@ -163,11 +163,11 @@ class GeneratorMetrics:
             if avg_duration > 10:
                 insight = f"⚠️  Slow generation speed ({avg_duration:.2f}s avg). Consider model optimization."
                 insights.append(insight)
-                logger.warning(insight)
+                self.logger.warning(insight)
             elif avg_duration < 2:
                 insight = f"✅ Fast generation speed ({avg_duration:.2f}s avg)."
                 insights.append(insight)
-                logger.info(insight)
+                self.logger.info(insight)
         
         # Token speed insights
         token_speed = summary.get('avg_tokens_per_second')
@@ -175,11 +175,11 @@ class GeneratorMetrics:
             if token_speed < 10:
                 insight = f"⚠️  Low token generation speed ({token_speed:.1f} tok/s). Check GPU utilization."
                 insights.append(insight)
-                logger.warning(insight)
+                self.logger.warning(insight)
             elif token_speed > 50:
                 insight = f"✅ Excellent token generation speed ({token_speed:.1f} tok/s)."
                 insights.append(insight)
-                logger.info(insight)
+                self.logger.info(insight)
         
         return insights
     
@@ -195,10 +195,10 @@ class GeneratorMetrics:
             with open(self.metrics_file, 'w') as f:
                 json.dump(data, f, indent=2, default=str)
             
-            logger.debug(f"Generator metrics saved to {self.metrics_file}")
+            self.logger.debug(f"Generator metrics saved to {self.metrics_file}")
                 
         except Exception as e:
-            logger.error(f"Failed to save generator metrics: {e}")
+            self.logger.error(f"Failed to save generator metrics: {e}")
     
     def clear_history(self):
         """Clear generation history."""
@@ -206,4 +206,4 @@ class GeneratorMetrics:
         self.generation_counter = 0
         self.session_start = datetime.now()
         
-        logger.info("Generator metrics history cleared")
+        self.logger.info("Generator metrics history cleared")

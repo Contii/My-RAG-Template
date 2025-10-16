@@ -1,9 +1,7 @@
 import psutil
 import torch
+import logging
 from datetime import datetime
-from logger.logger import get_logger
-
-logger = get_logger("system_metrics")
 
 """System-level metrics: CPU, RAM, GPU monitoring."""
 
@@ -11,8 +9,10 @@ class SystemMetrics:
     """Capture and track system resource usage."""
     
     def __init__(self):
+        self.logger = logging.getLogger("system_metrics")
+
         self.history = []
-        logger.info("SystemMetrics initialized")
+        self.logger.info("SystemMetrics initialized")
     
     def capture(self):
         """Capture current system state."""
@@ -44,7 +44,7 @@ class SystemMetrics:
                     'gpu_memory_percent': gpu_percent
                 })
             except Exception as e:
-                logger.warning(f"Error capturing GPU metrics: {e}")
+                self.logger.warning(f"Error capturing GPU metrics: {e}")
                 metrics['gpu_available'] = False
         else:
             metrics['gpu_available'] = False
@@ -100,4 +100,4 @@ class SystemMetrics:
     def clear_history(self):
         """Clear metrics history."""
         self.history.clear()
-        logger.info("System metrics history cleared")
+        self.logger.info("System metrics history cleared")
